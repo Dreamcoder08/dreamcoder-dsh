@@ -7,6 +7,8 @@ y el versionado respeta [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-24
+
 ### Added
 
 - CI (GitHub Actions): job de gate `tooling` (typecheck + integridad de
@@ -17,8 +19,6 @@ y el versionado respeta [Semantic Versioning](https://semver.org/lang/es/).
 - Documentación reestructurada inspirada en gentle-pi: README con badges,
   problema/solución, tablas de referencia; `docs/architecture.md`,
   `docs/skills-reference.md`, `docs/troubleshooting.md`.
-
-## [0.2.0] - 2026-08-24
 
 ### Changed
 
