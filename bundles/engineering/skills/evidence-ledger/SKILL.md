@@ -64,7 +64,7 @@ receipt_sha256: <rellenar al final>
 5. **Vía preferida — script del bundle** (deriva SHAs, diff y checks directamente de Git; el exit code 0 equivale a receipt `PASS`):
 
    ```bash
-   node <ruta-de-este-repo>/scripts/evidence-ledger.mjs \
+   bun run <ruta-de-este-repo>/scripts/evidence-ledger.ts \
      --mission <id> --base <sha_base> [--expected <n>] \
      --check "unit tests" -- "<comando de test>" \
      --check "lint" -- "<comando de lint>"
@@ -80,4 +80,4 @@ Devuelve: ruta del recibo (`<repo>/.evidence/<mission>.yaml`), su SHA256, estado
 
 ## References
 
-Entrada esperada de `workflow-router` (clasificación) y `tdd-evidence` / `review-4r` (evidencia y veredicto). Script generador: `scripts/evidence-ledger.mjs` en la raíz de este bundle-repo (registros en `<repo>/.evidence/`).
+Entrada esperada de `workflow-router` (clasificación) y `tdd-evidence` / `review-4r` (evidencia y veredicto). Script generador: `scripts/evidence-ledger.ts` en la raíz de este bundle-repo (registros en `<repo>/.evidence/`).

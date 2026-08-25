@@ -134,4 +134,4 @@ if $WITH_ENGRAM; then
   fi
 fi
 
-echo "==> Instalación completa. Verifica con: npm run verify (desde $REPO_ROOT)"
+echo "==> Instalación completa. Verifica con: bun run verify (desde $REPO_ROOT)"

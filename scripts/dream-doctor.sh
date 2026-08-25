@@ -34,7 +34,7 @@ if [ -f "$DSH_HOME/profiles/$PROFILE/package.json" ]; then
 else
   bad "perfil '$PROFILE' no instalado — ejecuta bash scripts/install.sh"
 fi
-DUMP="$(dsh --profile "$PROFILE" --dump-config 2>/dev/null)" && ok "composición del perfil genera (dsh --dump-config)" || { bad "la composición del perfil falla — corre npm run verify para el detalle"; }
+DUMP="$(dsh --profile "$PROFILE" --dump-config 2>/dev/null)" && ok "composición del perfil genera (dsh --dump-config)" || { bad "la composición del perfil falla — corre bun run verify para el detalle"; }
 
 echo "── 3. Política global"
 TARGET="$DSH_HOME/AGENTS.md"

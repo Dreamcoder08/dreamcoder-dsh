@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// evidence-ledger.mjs — receipt de misión derivado de Git.
+// evidence-ledger.ts — receipt de misión derivado de Git.
 //
 // Genera el registro probatorio de una misión: SHAs base/candidato, archivos
 // cambiados vs esperados, verificaciones ejecutadas (comando + exit code) y
@@ -8,23 +8,58 @@
 // ejecutados pueden demostrar.
 //
 // Uso:
-//   node scripts/evidence-ledger.mjs \
+//   bun run scripts/evidence-ledger.ts \
 //     --mission feat-auth-refresh \
 //     --base 82ac31 \
 //     [--expected 9] \
-//     --check "unit tests" -- "pnpm test --run" \
-//     [--check "lint" -- "pnpm lint"] ...
+//     --check "unit tests" -- "bun test" \
+//     [--check "lint" -- "bun run lint"] ...
 //
 // Escribe .evidence/mission-<mission>-<ts>.yaml y su SHA256. Exit code 0 solo
 // si todas las verificaciones pasan y el conteo de archivos coincide.
+//
+// Se ejecuta con Bun (TS nativo, sin build) y se tipa con tsgo 7.x.
 
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
+type YamlScalar = string | number | boolean | null | undefined | YamlValue[] | { [k: string]: YamlValue }
+type YamlValue = YamlScalar
+
+interface CheckSpec {
+  label: string
+  command: string[]
+}
+
+interface CheckResult {
+  label: string
+  command: string
+  exitCode: number
+  passed: boolean
+  outputTail: string
+}
+
+interface CliOptions {
+  mission: string
+  base: string
+  candidate?: string
+  expected?: number
+  checks: CheckSpec[]
+}
+
+/** Estado del parser antes de validar los campos obligatorios. */
+interface PartialCliOptions {
+  mission?: string
+  base?: string
+  candidate?: string
+  expected?: number
+  checks: CheckSpec[]
+}
+
 /** Serializa un valor como YAML de una línea (arrays/objetos anidan con flow style). */
-const yamlValue = (v) => {
+const yamlValue = (v: YamlValue): string => {
   if (v === null || v === undefined) return 'null'
   if (typeof v === 'number' || typeof v === 'boolean') return String(v)
   if (Array.isArray(v)) return '[' + v.map(yamlValue).join(', ') + ']'
@@ -34,41 +69,43 @@ const yamlValue = (v) => {
   }
   const s = String(v)
   // Cita si contiene caracteres que YAML reservaría o romperían el flujo.
-  return /[:#{}\[\],&*'"\n]|^[\s-]|[\s]$/.test(s) ? JSON.stringify(s) : s
+  return /[:#{}[\],&*'" \n]|^[\s-]|[\s]$/.test(s) ? JSON.stringify(s) : s
 }
 
-function parseArgs(argv) {
-  const out = { checks: [] }
+function parseArgs(argv: readonly string[]): CliOptions {
+  const out: PartialCliOptions = { checks: [] }
+  const isOptionBoundary = (token: string | undefined): boolean =>
+    token === undefined || token === '--check' ||
+    token === '--mission' || token === '--base' ||
+    token === '--candidate' || token === '--expected'
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
-    if (a === '--mission') out.mission = argv[++i]
-    else if (a === '--base') out.base = argv[++i]
-    else if (a === '--candidate') out.candidate = argv[++i]
+    if (a === '--mission') out.mission = argv[++i] as string
+    else if (a === '--base') out.base = argv[++i] as string
+    else if (a === '--candidate') out.candidate = argv[++i] as string
     else if (a === '--expected') out.expected = Number(argv[++i])
     else if (a === '--check') {
-      const label = argv[++i]
+      const label = argv[++i] as string
       if (argv[++i] !== '--') throw new Error('--check requiere "-- <comando>"')
-      const cmd = []
-      while (i + 1 < argv.length && argv[i + 1] !== '--check' && !argv[i + 1].startsWith('--mission') &&
-             !argv[i + 1].startsWith('--base') && !argv[i + 1].startsWith('--candidate') &&
-             !argv[i + 1].startsWith('--expected')) cmd.push(argv[++i])
+      const cmd: string[] = []
+      while (!isOptionBoundary(argv[i + 1])) cmd.push(argv[++i] as string)
       // Un único token con espacios = comando citado como string completo.
-      const resolved = cmd.length === 1 && /\s/.test(cmd[0]) ? cmd[0].trim().split(/\s+/) : cmd
+      const resolved = cmd.length === 1 && /\s/.test(cmd[0] ?? '') ? (cmd[0] as string).trim().split(/\s+/) : cmd
       if (resolved.length === 0) throw new Error(`--check '${label}' sin comando`)
       out.checks.push({ label, command: resolved })
     } else throw new Error(`Argumento desconocido: ${a}`)
   }
   if (!out.mission) throw new Error('--mission es obligatorio')
   if (!out.base) throw new Error('--base es obligatorio')
-  return out
+  return out as CliOptions
 }
 
 const opts = parseArgs(process.argv.slice(2))
 
-const git = (args) => {
+const git = (args: string[]): string => {
   const r = spawnSync('git', args, { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 })
   if (r.status !== 0) throw new Error(`git ${args.join(' ')} falló:\n${r.stderr}`)
-  return r.stdout.trim()
+  return (r.stdout ?? '').trim()
 }
 
 const candidate = opts.candidate ?? git(['rev-parse', 'HEAD'])
@@ -77,11 +114,12 @@ const ancestorOk =
   spawnSync('git', ['merge-base', '--is-ancestor', base, candidate], { encoding: 'utf8' }).status === 0
 
 const changedFiles = git(['diff', '--name-only', `${base}..${candidate}`]).split('\n').filter(Boolean)
-const insertions = Number(git(['diff', '--shortstat', `${base}..${candidate}`]).match(/(\d+) insertion/)?.[1] ?? 0)
-const deletions = Number(git(['diff', '--shortstat', `${base}..${candidate}`]).match(/(\d+) deletion/)?.[1] ?? 0)
+const shortstat = git(['diff', '--shortstat', `${base}..${candidate}`])
+const insertions = Number(shortstat.match(/(\d+) insertion/)?.[1] ?? 0)
+const deletions = Number(shortstat.match(/(\d+) deletion/)?.[1] ?? 0)
 
-const runCheck = (c) => {
-  const r = spawnSync(c.command[0], c.command.slice(1), { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 })
+const runCheck = (c: CheckSpec): CheckResult => {
+  const r = spawnSync(c.command[0] as string, c.command.slice(1), { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 })
   return {
     label: c.label,
     command: c.command.join(' '),
@@ -92,7 +130,7 @@ const runCheck = (c) => {
 }
 const checks = opts.checks.map(runCheck)
 
-const scopeMatch = opts.expected === undefined ? null : changedFiles.length === opts.expected
+const scopeMatch: boolean | null = opts.expected === undefined ? null : changedFiles.length === opts.expected
 
 const receipt = {
   mission: opts.mission,
@@ -113,14 +151,14 @@ const receipt = {
 }
 
 const allChecksPass = checks.length > 0 && checks.every((c) => c.passed)
-const verdict = ancestorOk && allChecksPass && scopeMatch !== false ? 'PASS' : 'FAIL'
+const verdict: 'PASS' | 'FAIL' = ancestorOk && allChecksPass && scopeMatch !== false ? 'PASS' : 'FAIL'
 
 const dir = join(process.cwd(), '.evidence')
 mkdirSync(dir, { recursive: true })
 const body =
-  `# Evidence receipt — generado por scripts/evidence-ledger.mjs\n` +
+  `# Evidence receipt — generado por scripts/evidence-ledger.ts\n` +
   Object.entries(receipt)
-    .map(([k, v]) => `${k}: ${yamlValue(v)}`)
+    .map(([k, v]) => `${k}: ${yamlValue(v as YamlValue)}`)
     .join('\n') +
   `\nverdict: ${verdict}\n`
 const sha256 = createHash('sha256').update(body).digest('hex')

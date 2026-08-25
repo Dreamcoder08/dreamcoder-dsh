@@ -30,29 +30,37 @@ DeepSeek Harness, sin modificar el core de DSH.
   routing de modelos (§8) y autonomía acotada (§9).
 - `memory/engram.cordis.yml` — overlay opcional de memoria longitudinal
   (Engram vía MCP); se habilita con `install.sh --with-engram`.
-- `scripts/red-green.mjs` — captura observable del ciclo RED→GREEN en
+- `scripts/red-green.ts` — captura observable del ciclo RED→GREEN en
   `<repo>/.evidence/`; exit code 0 = ciclo válido.
-- `scripts/evidence-ledger.mjs` — receipt de misión derivado de Git (SHAs,
+- `scripts/evidence-ledger.ts` — receipt de misión derivado de Git (SHAs,
   scope, checks) con SHA256 de cierre.
 - `scripts/dream-doctor.sh` — salud de la instalación: binarios, perfil,
   política, presets, skills, memoria opcional.
 - `profiles/engineering/` — manifiesto del perfil: bundles `base` + `web-app`
   + este bundle.
 - `scripts/install.sh` — instalación idempotente del perfil.
-- `scripts/verify-compat.mjs` — suite de compatibilidad contra la versión
+- `scripts/verify-compat.ts` — suite de compatibilidad contra la versión
   pineada de DSH (compone el perfil con el mismo algoritmo que el arranque).
-- `scripts/verify-presets.mjs` — valida cada agent preset: sintaxis YAML,
+- `scripts/verify-presets.ts` — valida cada agent preset: sintaxis YAML,
   forma de filas y resolución de paquetes desde el perfil instalado.
 
 ## Uso
 
+Requisitos: `dsh` + `pnpm` (instalación DSH), [Bun](https://bun.sh) ≥1.2 y Node ≥22.18 para el tooling.
+
 ```bash
+bun install                           # dependencias de desarrollo (tsgo, @types/node)
 bash scripts/install.sh              # instala perfil, política y presets
 bash scripts/install.sh --with-engram  # además habilita memoria Engram (requiere binario)
-pnpm run verify                       # verifica la composición (dsh --dump-config)
+bun run verify                       # verifica la composición (dsh --dump-config)
+bun run typecheck                    # tsgo 7.x (TypeScript nativo) sobre todo el tooling
 bash scripts/dream-doctor.sh         # salud de la instalación
 dsh --profile engineering            # arranca la sesión
 ```
+
+Todo el tooling del bundle es TypeScript estricto (`scripts/*.ts`) ejecutado con
+Bun —TS nativo sin build step— y tipado con la línea 7.x del compilador nativo
+(`@typescript/native-preview`, `tsgo`).
 
 Dentro de la sesión, los presets están disponibles en el selector de agentes;
 la skill `workflow-router` clasifica cada tarea (P0–P3) y elige el workflow
@@ -66,11 +74,11 @@ Fases implementadas:
   **M3** routing de workflows.
 - **M4** memoria: gate de memoria (skill `memory-gate`) + overlay Engram
   opcional (`--with-engram`).
-- **M5** TDD con evidencia: captura RED→GREEN por el script `red-green.mjs`
+- **M5** TDD con evidencia: captura RED→GREEN por el script `red-green.ts`
   (el harness observa el ciclo; el relato no basta).
 - **M6** revisión: lentes 4R con contexto fresco (presets reviewer/security).
 - **M7** evidence ledger: receipts derivados de Git con SHA256
-  (`evidence-ledger.mjs`).
+  (`evidence-ledger.ts`).
 - **M8** context governor: presupuestos y reglas de compactación (política §7).
 - **M9** model routing: decisión explícita rol→riesgo→modelo (política §8 +
   skill `model-router`).

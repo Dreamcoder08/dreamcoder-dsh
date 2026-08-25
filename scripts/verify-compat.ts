@@ -1,11 +1,14 @@
 #!/usr/bin/env node
-// verify-compat.mjs — suite de compatibilidad del bundle Dreamcoder contra la
+// verify-compat.ts — suite de compatibilidad del bundle Dreamcoder contra la
 // instalación local de DSH.
 //
 // Compone el perfil `engineering` offline (dsh --dump-config usa el mismo
 // algoritmo de capas que el arranque real) y afirma que las filas objetivo
 // existen con los contratos esperados. Un cambio upstream que rompa un id o
 // una config hace fallar esta suite ANTES de arrancar una sesión.
+//
+// Se ejecuta con Bun (TS nativo, sin build) y se tipa con tsgo 7.x.
+
 import { spawnSync } from 'node:child_process'
 import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
@@ -15,10 +18,22 @@ const repoRoot = join(fileURLToPath(new URL('.', import.meta.url)), '..')
 const profile = process.argv[2] ?? 'engineering'
 const skillsDir = join(repoRoot, 'bundles', 'engineering', 'skills')
 const personaMarker = process.env.DC_PERSONA_MARKER ?? 'Dreamcoder'
-const dshHomeCheck = process.env.DSH_HOME ?? join(process.env.HOME ?? '', '.dsh')
+const dshHome = process.env.DSH_HOME ?? join(process.env.HOME ?? '', '.dsh')
+
+const SKILL_NAMES = [
+  'workflow-router',
+  'tdd-evidence',
+  'review-4r',
+  'evidence-ledger',
+  'memory-gate',
+  'model-router',
+  'autonomous-mission',
+] as const
+
+const PRESET_ROLES = ['explorer', 'architect', 'implementer', 'tester', 'reviewer', 'security'] as const
 
 let failures = 0
-const check = (name, ok, detail = '') => {
+const check = (name: string, ok: boolean, detail = ''): void => {
   console.log(`${ok ? '  ✔' : '  ✘'} ${name}${detail ? ` — ${detail}` : ''}`)
   if (!ok) failures += 1
 }
@@ -33,7 +48,7 @@ if (dump.status !== 0) {
   console.error('ERROR: la composición del perfil falló:\n' + dump.stderr)
   process.exit(1)
 }
-const config = dump.stdout
+const config = dump.stdout ?? ''
 
 console.log('==> Afirmaciones de composición:')
 check('fila system-prompt presente', /id: system-prompt/.test(config))
@@ -43,12 +58,10 @@ check(
   `marcador '${personaMarker}' en la sección system-prompt`,
 )
 check('fila skill-filesystem presente', /id: skill-filesystem/.test(config))
-const dshHomeVerify = process.env.DSH_HOME ?? join(process.env.HOME ?? '', '.dsh')
-const skillsUserDir = join(dshHomeVerify, 'skills')
+const skillsUserDir = join(dshHome, 'skills')
 check(
   'skills enlazadas en $DSH_HOME/skills (raíz user-dsh por defecto)',
-  ['workflow-router', 'tdd-evidence', 'review-4r', 'evidence-ledger', 'memory-gate', 'model-router', 'autonomous-mission']
-    .every((s) => existsSync(join(skillsUserDir, s, 'SKILL.md'))),
+  SKILL_NAMES.every((s) => existsSync(join(skillsUserDir, s, 'SKILL.md'))),
   skillsUserDir,
 )
 check('fila agent-presets presente (roster de presets)', /id: agent-presets/.test(config))
@@ -63,30 +76,22 @@ for (const dir of [
   'workflows/mini-sdd.md',
   'workflows/full-sdd.md',
   'memory/engram.cordis.yml',
-  'scripts/red-green.mjs',
-  'scripts/evidence-ledger.mjs',
+  'scripts/red-green.ts',
+  'scripts/evidence-ledger.ts',
   'scripts/dream-doctor.sh',
 ]) {
   check(`${dir} existe`, existsSync(join(repoRoot, dir)))
 }
-for (const skill of [
-  'workflow-router',
-  'tdd-evidence',
-  'review-4r',
-  'evidence-ledger',
-  'memory-gate',
-  'model-router',
-  'autonomous-mission',
-]) {
+for (const skill of SKILL_NAMES) {
   const p = join(skillsDir, skill, 'SKILL.md')
   let frontmatterOk = false
   if (existsSync(p)) {
     const head = readFileSync(p, 'utf8').split('---').slice(0, 3)
-    frontmatterOk = head.length >= 3 && /^name:/m.test(head[1])
+    frontmatterOk = head.length >= 3 && /^name:/m.test(head[1] ?? '')
   }
   check(`skill ${skill} con frontmatter válido`, frontmatterOk, p)
 }
-for (const preset of ['explorer', 'architect', 'implementer', 'tester', 'reviewer', 'security']) {
+for (const preset of PRESET_ROLES) {
   const p = join(repoRoot, 'agents', preset, 'agent.cordis.yml')
   let okShape = false
   if (existsSync(p)) {
@@ -98,9 +103,7 @@ for (const preset of ['explorer', 'architect', 'implementer', 'tester', 'reviewe
 }
 // Los presets enlazados deben componer: el roster los descubre vía
 // $DSH_HOME/.agent-presets; un preset roto aparecería como broken.
-const dshHome = dshHomeCheck
-const presetsLinkOk = ['explorer', 'architect', 'implementer', 'tester', 'reviewer', 'security']
-  .every((role) => existsSync(join(dshHome, '.agent-presets', role, 'agent.cordis.yml')))
+const presetsLinkOk = PRESET_ROLES.every((role) => existsSync(join(dshHome, '.agent-presets', role, 'agent.cordis.yml')))
 check('presets accesibles desde $DSH_HOME/.agent-presets (instalados)', presetsLinkOk)
 
 console.log(
