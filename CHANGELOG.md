@@ -7,6 +7,22 @@ y el versionado respeta [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Added
+
+- Tests unitarios de las herramientas (`bun test`, 14 casos): ciclos RED→GREEN de
+  `scripts/red-green.ts` y recibos PASS/FAIL/scope de `scripts/evidence-ledger.ts`.
+- `scripts/dream-metrics.ts`: métricas de proceso de ingeniería derivadas de
+  `.evidence/` (misiones por veredicto, tasa de éxito, ciclos TDD válidos/inválidos,
+  pendientes) con salida humana o `--json`; aritmética entera exacta (BigInt).
+- Política §10: carga de skills con ranking (máximo 3 por fase, difiere posteriores,
+  declara "sin skill aplicable").
+- CI: paso `bun test` en el job `tooling`.
+
+### Fixed
+
+- Tipado de tests: `@types/bun` añadido y habilitado en `tsconfig.json`
+  (`types: ["node", "bun"]`) para que el typecheck cubra los archivos de test.
+
 ## [0.2.0] - 2026-08-24
 
 ### Added

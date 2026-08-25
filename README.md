@@ -244,7 +244,7 @@ Fases implementadas:
 - **M7** evidence ledger con SHA256 derivado de Git.
 - **M8** context governor: presupuestos y compactación (política §7).
 - **M9** model routing explícito (política §8 + skill `model-router`).
-- **M10** observabilidad: `dream-doctor.sh` + registros en `.evidence/`.
+- **M10** observabilidad: `dream-doctor.sh` + `dream-metrics.ts` (métricas de proceso desde recibos) + registros en `.evidence/`.
 - **M11** autonomía acotada: goals persistidos + jobs con límites duros (§9).
 
 Pendiente conocido:
