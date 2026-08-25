@@ -1,0 +1,9 @@
+# Clasificación lingüística determinista para GitHub.
+# El tooling es TypeScript (Bun runtime); los Markdown son documentación del
+# proyecto y no deben competir en el gráfico de lenguajes.
+
+*.ts linguist-language=TypeScript
+*.md linguist-documentation
+bun.lock linguist-generated
+pnpm-lock.yaml linguist-generated
+package.json linguist-generated
