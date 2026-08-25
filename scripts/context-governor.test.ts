@@ -46,10 +46,12 @@ describe('context-governor.ts', () => {
     assert.match(r.stdout, /context:ok/)
     const events = readFileSync(join(root, 'context-events.jsonl'), 'utf8').trim().split('\n')
     assert.equal(events.length, 1)
-    const evt = JSON.parse(events[0]!) as { event: string; tokens: number; session: string }
+    const evt = JSON.parse(events[0]!) as { event: string; tokens: number; sessionId: string }
     assert.equal(evt.event, 'context:ok')
     assert.equal(evt.tokens, 2000) // max over steps, not the last nor the sum
-    assert.equal(evt.session, name)
+    // El evento persiste un id hasheado (12 hex), nunca el nombre local crudo.
+    assert.equal(evt.sessionId.length, 12)
+    assert.doesNotMatch(evt.sessionId, /session|aaa/)
   })
 
   test('warning at the native compaction threshold (exit 1)', () => {
@@ -85,8 +87,17 @@ describe('context-governor.ts', () => {
       '--sessions-dir', root2,
       '--window', '1000', '--warning', '0.6', '--critical', '0.5',
     ])
-    assert.equal(badOrder.status, 2)
-    assert.match(badOrder.stderr, /mayor que --warning/)
+    // Uso inválido de CLI: exit 4 exclusivo, jamás un veredicto (0/1/2).
+    assert.equal(badOrder.status, 4)
+    assert.match(badOrder.stderr, /mayor que el umbral de warning/)
+  })
+
+  test('--critical alone below the default warning is a hard error too (no silent clamp)', () => {
+    const root = newRoot()
+    newSession(root, 'session-clamp', [500])
+    const r = run(['--sessions-dir', root, '--window', '1000', '--critical', '0.4'])
+    assert.equal(r.status, 4)
+    assert.match(r.stderr, /warning efectivo/)
   })
 
   test('picks the most recently modified session when none is named', () => {
@@ -128,5 +139,56 @@ describe('context-governor.ts', () => {
     assert.equal(evt.event, 'context:ok')
     assert.ok(Math.abs(evt.ratio - 0.5) < 1e-9)
     assert.ok(existsSync(join(root, 'context-events.jsonl')))
+  })
+
+  // ── Caracterización de los caminos de fallo corregidos tras la review 4R ──
+
+  test('a dangling --sessions-dir value is usage error 4, never a green verdict', () => {
+    const root = newRoot()
+    newSession(root, 'session-real', [120000]) // would be critical if measured
+    // El flag sin valor NO debe caer al default ni medir nada: exit 4.
+    const r = run(['--sessions-dir'])
+    assert.equal(r.status, 4)
+    assert.match(r.stderr, /requiere un valor/)
+  })
+
+  test('--session rejects path traversal characters (exit 4)', () => {
+    const root = newRoot()
+    newSession(root, 'session-target', [1000])
+    const r = run([
+      '--sessions-dir', root, '--evidence-dir', root,
+      '--session', '../other/session-x',
+    ])
+    assert.equal(r.status, 4)
+    assert.match(r.stderr, /A-Za-z0-9/)
+  })
+
+  test('--window rejects non-integer values (exit 4)', () => {
+    const root = newRoot()
+    newSession(root, 'session-win', [500])
+    const r = run(['--sessions-dir', root, '--evidence-dir', root, '--window', '1.5'])
+    assert.equal(r.status, 4)
+    assert.match(r.stderr, /entero positivo/)
+  })
+
+  test('corrupt .zstd log is infra error 5 with a named cause — never exit 3 "sin datos"', () => {
+    const root = newRoot()
+    const dir = join(root, 'session-corrupt')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'session.jsonl.zstd'), Buffer.from('esto no es zstd'))
+    const r = run(['--sessions-dir', root, '--evidence-dir', root])
+    assert.equal(r.status, 5)
+    assert.match(r.stderr, /ilegible/)
+  })
+
+  test('a directory without any session log is not a session candidate', () => {
+    const root = newRoot()
+    // Dir con log real + dir más reciente SIN log: el gate debe medir el que tiene.
+    newSession(root, 'session-with-log', [110000])
+    mkdirSync(join(root, 'not-a-session'), { recursive: true })
+    writeFileSync(join(root, 'not-a-session', 'random.txt'), 'x')
+    const r = run(['--sessions-dir', root, '--evidence-dir', root])
+    assert.equal(r.status, 1) // midió session-with-log (warning), no cayó en exit 3
+    assert.match(r.stdout, /session-with-log/)
   })
 })

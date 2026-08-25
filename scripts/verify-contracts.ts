@@ -16,6 +16,7 @@
 
 import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 interface ModelProfile {
   role: string
@@ -66,6 +67,35 @@ const isStringArray = (v: unknown, minLen: number): v is string[] =>
   v.length > 0 &&
   v.every((s) => typeof s === 'string' && s.length >= minLen)
 
+/**
+ * El schema declara additionalProperties:false; el subset del verificador
+ * aplica la misma regla — una clave desconocida es deriva silenciosa y falla.
+ */
+const rejectUnknownKeys = (
+  obj: Record<string, unknown>,
+  allowed: readonly string[],
+  label: string,
+): void => {
+  for (const k of Object.keys(obj)) {
+    if (!allowed.includes(k)) fail(`${label}: clave desconocida '${k}'`)
+  }
+}
+const TOP_KEYS = ['$schema', 'workflow', 'risk', 'doc', 'context_budget_ref', 'stages']
+const STAGE_KEYS = [
+  'id',
+  'heading',
+  'executes',
+  'inputs',
+  'outputs',
+  'exit_criteria',
+  'model_profile',
+  'token_budget',
+  'allowed_tools',
+  'memory_policy',
+]
+const MODEL_PROFILE_KEYS = ['role', 'compute', 'fresh_context']
+const TOKEN_BUDGET_KEYS = ['franja', 'fraction']
+
 /** Extrae los encabezados de etapa del documento del workflow según su tipo. */
 const headingRegexes: Record<string, RegExp> = {
   direct: /^### \d+\. (.+)$/m,
@@ -96,6 +126,7 @@ const validateContract = (raw: unknown, file: string): Contract | null => {
   const base = errors.length
   if (typeof raw !== 'object' || raw === null) return fail(`${file}: no es un objeto JSON`), null
   const c = raw as Record<string, unknown>
+  rejectUnknownKeys(c, TOP_KEYS, file)
   for (const k of ['$schema', 'workflow', 'risk', 'doc', 'context_budget_ref', 'stages']) {
     if (!(k in c)) fail(`${file}: falta campo obligatorio '${k}'`)
   }
@@ -124,6 +155,7 @@ const validateContract = (raw: unknown, file: string): Contract | null => {
     const label = `${file}#stages[${i}]`
     if (typeof s !== 'object' || s === null) return fail(`${label}: no es objeto`), null
     const st = s as Record<string, unknown>
+    rejectUnknownKeys(st, STAGE_KEYS, label)
     for (const k of [
       'id',
       'heading',
@@ -143,6 +175,12 @@ const validateContract = (raw: unknown, file: string): Contract | null => {
     } else if (seen.has(st['id'])) {
       fail(`${label}: id duplicado '${st['id']}'`)
     } else seen.add(st['id'])
+    // Heading único dentro del contrato: dos etapas bajo el mismo encabezado
+    // son un mapeo ambiguo que el cruce contra el doc no detectaría solo.
+    if (typeof st['heading'] === 'string' && st['heading'].length >= 3) {
+      const dup = stages.some((prev) => prev.heading === st['heading'])
+      if (dup) fail(`${label}: heading duplicado "${st['heading']}"`)
+    }
     for (const k of ['heading', 'executes'] as const) {
       if (typeof st[k] !== 'string' || (st[k] as string).length < 3) fail(`${label}: '${k}' inválido`)
     }
@@ -154,6 +192,7 @@ const validateContract = (raw: unknown, file: string): Contract | null => {
     if (typeof mp !== 'object' || mp === null) {
       fail(`${label}: 'model_profile' debe ser objeto`)
     } else {
+      rejectUnknownKeys(mp, MODEL_PROFILE_KEYS, `${label}.model_profile`)
       if (typeof mp['role'] !== 'string' || mp['role'].length < 3) fail(`${label}: model_profile.role inválido`)
       if (typeof mp['compute'] !== 'string' || !COMPUTES.has(mp['compute'])) {
         fail(`${label}: model_profile.compute debe ser capable|fast|fresh-reviewer|session`)
@@ -164,6 +203,7 @@ const validateContract = (raw: unknown, file: string): Contract | null => {
     if (typeof tb !== 'object' || tb === null) {
       fail(`${label}: 'token_budget' debe ser objeto`)
     } else {
+      rejectUnknownKeys(tb, TOKEN_BUDGET_KEYS, `${label}.token_budget`)
       if (typeof tb['franja'] !== 'string' || !FRANJAS.has(tb['franja'])) {
         fail(`${label}: token_budget.franja fuera de las franjas de §7`)
       }
@@ -179,24 +219,38 @@ const validateContract = (raw: unknown, file: string): Contract | null => {
     }
     stages.push(st as unknown as Stage)
   }
-  if (errors.length > 0) return null
+  // Marca local, no el array global: los errores de un archivo anterior no
+  // deben silenciar la validación (ni el cruce contra doc) del siguiente.
+  if (errors.length > base) return null
   return c as unknown as Contract
 }
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
+// Exit codes: 0 válido · 1 contrato/schema/dir inválido · 2 uso incorrecto de
+// CLI (argumento desconocido o flag con valor colgante — nunca un veredicto).
 const argv = process.argv
 let contractsDirArg: string | undefined
 let schemaArg: string | undefined
+/** Valor de flag obligatorio: presente y no-starting-with '--'. */
+const valueOf = (i: number): string => {
+  const v = argv[i + 1]
+  if (v === undefined || v.startsWith('--')) {
+    console.error(`Argumento inválido: ${String(argv[i])} requiere un valor`)
+    process.exit(2)
+  }
+  return v
+}
 for (let i = 2; i < argv.length; i++) {
-  if (argv[i] === '--contracts-dir') contractsDirArg = argv[++i]
-  else if (argv[i] === '--schema') schemaArg = argv[++i]
+  const a = argv[i]!
+  if (a === '--contracts-dir') contractsDirArg = valueOf(i++)
+  else if (a === '--schema') schemaArg = valueOf(i++)
   else {
-    console.error(`Argumento desconocido: ${String(argv[i])}`)
+    console.error(`Argumento desconocido: ${a}`)
     process.exit(2)
   }
 }
 
-const repoRoot = resolve(dirname(import.meta.url.replace('file://', '')), '..')
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const contractsDir = contractsDirArg !== undefined ? resolve(contractsDirArg) : join(repoRoot, 'contracts')
 const schemaPath = schemaArg !== undefined ? resolve(schemaArg) : join(repoRoot, 'schemas', 'stage-contract.schema.json')
 
@@ -209,13 +263,23 @@ try {
   process.exit(1)
 }
 
-const files = readdirSync(contractsDir).filter((f) => f.endsWith('.json')).sort()
+let files: string[]
+try {
+  files = readdirSync(contractsDir).filter((f) => f.endsWith('.json')).sort()
+} catch (e) {
+  console.error(`ERROR: directorio de contratos ilegible en ${contractsDir}: ${String(e)}`)
+  process.exit(1)
+}
 if (files.length === 0) {
   console.error(`ERROR: sin contratos *.json en ${contractsDir}`)
   process.exit(1)
 }
 
 console.log(`==> Verificando ${files.length} contrato(s) en ${contractsDir}`)
+
+// Un workflow no puede estar cubierto por dos contratos: sería validación
+// duplicada silenciosa y la deriva entre ambos pasaría inadvertida.
+const seenWorkflows = new Set<string>()
 
 for (const f of files) {
   const path = join(contractsDir, f)
@@ -230,8 +294,22 @@ for (const f of files) {
   const contract = validateContract(raw, f)
   if (contract === null) continue
 
+  if (seenWorkflows.has(contract.workflow)) {
+    fail(`${f}: otro contrato ya declara el workflow '${contract.workflow}'`)
+    continue
+  }
+  seenWorkflows.add(contract.workflow)
+
   // ── Cruce contrato ↔ documento ──
+  // Contención: el doc debe vivir junto al dir de contratos (en el repo:
+  // contracts/../ = raíz del repo); un contract hostil no puede hacer leer
+  // rutas arbitrarias al verificador.
+  const docRoot = dirname(contractsDir)
   const docPath = resolve(contractsDir, contract.doc)
+  if (!docPath.startsWith(docRoot + '/')) {
+    fail(`${f}: 'doc' escapa del árbol permitido (${contract.doc})`)
+    continue
+  }
   let docBody: string
   try {
     docBody = readFileSync(docPath, 'utf8')
@@ -240,6 +318,12 @@ for (const f of files) {
     continue
   }
   const headings = docStageHeadings(contract.workflow, docBody)
+  // Encabezados únicos en el doc: dos etapas bajo un mismo heading es un
+  // mapeo ambiguo que `includes()` + conteo darían por bueno.
+  if (new Set(headings).size !== headings.length) {
+    fail(`${f}: ${contract.doc} tiene encabezados de etapa duplicados — mapeo ambiguo`)
+    continue
+  }
   for (const st of contract.stages) {
     if (!headings.includes(st.heading.trim())) {
       fail(`${f}: la etapa '${st.id}' declara heading "${st.heading}" que no aparece como encabezado de etapa en ${contract.doc}`)

@@ -144,4 +144,86 @@ describe('verify-contracts.ts', () => {
     assert.match(r.stderr, /schema ilegible/)
     assert.ok(!REPO_SCHEMA.includes('nope')) // sanity: schema real intacto
   })
+
+  // ── Caracterización de los caminos corregidos tras la review 4R ──
+
+  test('an unknown key is rejected (additionalProperties: false enforced)', () => {
+    const dir = newDir()
+    mutatedContract(dir, (c) => {
+      ;(c as Record<string, unknown>)['stagges_typo'] = true
+    })
+    const r = run(dir)
+    assert.equal(r.status, 1)
+    assert.match(r.stderr, /clave desconocida 'stagges_typo'/)
+  })
+
+  test('a broken FIRST file does not hide the cross-check of later valid files', () => {
+    const root = fixtureWithDocs()
+    const contractsDir = join(root, 'contracts')
+    // Primer archivo: JSON ilegible. Segundo: heading inexistente — su error
+    // DEBE aparecer aunque el primero ya haya fallado.
+    writeFileSync(join(contractsDir, 'aaa-broken.json'), '{ no json')
+    mutatedContract(contractsDir, (c) => {
+      const stages = c['stages'] as Array<Record<string, unknown>>
+      stages[0]!['heading'] = 'Etapa Inexistente'
+    })
+    const r = run(contractsDir)
+    assert.equal(r.status, 1)
+    assert.match(r.stderr, /JSON ilegible/)
+    assert.match(r.stderr, /no aparece como encabezado de etapa/)
+  })
+
+  test('duplicated stage headings in a doc are an ambiguous mapping (rejected)', () => {
+    const root = fixtureWithDocs()
+    const docPath = join(root, 'workflows', 'mini-sdd.md')
+    const body = readFileSync(docPath, 'utf8').replace(
+      /^## \d+\. (.+)$/gm,
+      (m, t: string) => `## 1. ${t.trim()}`,
+    )
+    writeFileSync(docPath, body) // todos los headings idénticos
+    const contractsDir = join(root, 'contracts')
+    const raw = JSON.parse(readFileSync(join(REPO_CONTRACTS, 'mini-sdd.json'), 'utf8')) as Record<string, unknown>
+    const stages = raw['stages'] as Array<Record<string, unknown>>
+    for (const st of stages.slice(0, 2)) st['heading'] = 'Propuesta breve'
+    raw['stages'] = stages.slice(0, 2)
+    writeFileSync(join(contractsDir, 'mini-sdd.json'), JSON.stringify(raw))
+    const r = run(contractsDir)
+    assert.equal(r.status, 1)
+    assert.match(r.stderr, /encabezados de etapa duplicados|heading duplicado/)
+  })
+
+  test('doc path escaping the allowed tree is rejected', () => {
+    const dir = newDir()
+    mutatedContract(dir, (c) => {
+      c['doc'] = '../../../../../etc/hostname.md'
+    })
+    const r = run(dir)
+    assert.equal(r.status, 1)
+    assert.match(r.stderr, /escapa del árbol permitido/)
+  })
+
+  test('a dangling --contracts-dir value is usage error 2, never repo defaults', () => {
+    const r = spawnSync(RUNNER, [SCRIPT, '--contracts-dir'], { encoding: 'utf8' })
+    assert.equal(r.status, 2)
+    assert.match(r.stderr, /requiere un valor/)
+  })
+
+  test('nonexistent --contracts-dir gets a named error, not a raw ENOENT stack', () => {
+    const r = spawnSync(RUNNER, [SCRIPT, '--contracts-dir', join(newDir(), 'no-existe')], {
+      encoding: 'utf8',
+    })
+    assert.equal(r.status, 1)
+    assert.match(r.stderr, /directorio de contratos ilegible/)
+  })
+
+  test('the same workflow declared by two contracts is rejected', () => {
+    const root = fixtureWithDocs()
+    const contractsDir = join(root, 'contracts')
+    const mini = readFileSync(join(REPO_CONTRACTS, 'mini-sdd.json'), 'utf8')
+    writeFileSync(join(contractsDir, 'mini-sdd.json'), mini)
+    writeFileSync(join(contractsDir, 'mini-sdd-copy.json'), mini)
+    const r = run(contractsDir)
+    assert.equal(r.status, 1)
+    assert.match(r.stderr, /ya declara el workflow 'mini-sdd'/)
+  })
 })

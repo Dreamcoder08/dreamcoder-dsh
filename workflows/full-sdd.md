@@ -67,4 +67,4 @@ aprueba gates, archiva y es el único rol que recupera memoria (`policy/AGENTS.m
 
 ## Contrato machine-readable
 
-Las etapas de este workflow tienen contrato verificable en `contracts/full-sdd.json` (schema: `schemas/stage-contract.schema.json`). El cruce contrato↔documento lo valida `bun run scripts/verify-contracts.ts` — parte del gate `bun run verify`. Si este documento y el contrato divergen, la verificación falla: arregla la fuente de deriva, no el verificador.
+Las etapas de este workflow tienen contrato verificable en `contracts/full-sdd.json` (schema: `schemas/stage-contract.schema.json`). El cruce contrato↔documento lo valida `node scripts/verify-contracts.ts` — parte del gate `pnpm verify`. Si este documento y el contrato divergen, la verificación falla: arregla la fuente de deriva, no el verificador.

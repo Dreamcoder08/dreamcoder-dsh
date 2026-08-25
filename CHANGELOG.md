@@ -34,7 +34,7 @@ y el versionado respeta [Semantic Versioning](https://semver.org/lang/es/).
 - `schemas/cordis-patch.schema.json` + modeline `yaml-language-server` en
   `cordis.patch.yml`: evita que el LSP infiera el schema equivocado
   (JSONPatch) sobre los patches cordis.
-- Tests unitarios de las herramientas (`bun test`, ahora 32 casos): ciclos
+- Tests unitarios de las herramientas (32 casos, runner `node --test`): ciclos
   RED→GREEN de `scripts/red-green.ts`, recibos PASS/FAIL/scope de
   `scripts/evidence-ledger.ts`, agregación de telemetría de
   `scripts/dream-metrics.ts`, contratos por etapa y governor de contexto.

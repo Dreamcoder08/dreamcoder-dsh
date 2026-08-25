@@ -142,7 +142,9 @@ Reglas operativas:
   el objetivo y la evidencia ya publicada. La presión se mide, no se intuye:
   `scripts/context-governor.ts` lee el uso real de la sesión y emite `context:ok`,
   `context:warning` o `context:critical`; un `warning` obliga a cerrar la unidad en curso y un
-  `critical` a compactar ya (exit codes 0/1/2 como gate componible).
+  `critical` a compactar ya. Tabla completa de exit codes del governor: `0` ok, `1` warning,
+  `2` critical, `3` sin datos de uso, `4` uso inválido de CLI, `5` error de infraestructura —
+  cada código es exclusivo y componible como gate.
 - Una tarea que exige más contexto del disponible se divide en misiones encadenadas con recibos
   propios (`evidence-ledger`), no en un turno gigante.
 
