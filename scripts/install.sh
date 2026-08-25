@@ -25,9 +25,11 @@ PROFILE_DIR="$DSH_HOME/profiles/$PROFILE_NAME"
 PRESETS_DIR="$DSH_HOME/.agent-presets"
 
 WITH_ENGRAM=false
+WITH_EXTERNAL_SUBAGENTS=false
 for arg in "$@"; do
   case "$arg" in
     --with-engram) WITH_ENGRAM=true ;;
+    --with-external-subagents) WITH_EXTERNAL_SUBAGENTS=true ;;
     *) echo "Argumento desconocido: $arg" >&2; exit 2 ;;
   esac
 done
@@ -61,6 +63,19 @@ sed "s|link:@BUNDLE_DIR@|link:$BUNDLE_DIR|" \
 
 echo "==> Sincronizando instalación del perfil…"
 dsh plugin --profile "$PROFILE_NAME" install
+
+# ── 1b. Subagentes externos (opcional, --with-external-subagents) ───────────
+# Camino de instalación documentado por los propios paquetes upstream:
+# `dsh plugin --profile <name> add <pkg>`. Los providers no arrancan proceso
+# alguno hasta que una tool los invoca; quitar el paquete retira el provider.
+if $WITH_EXTERNAL_SUBAGENTS; then
+  # Pin @next (0.1.1-rc.x): es la línea compatible con el core rc.x moderno;
+  # `latest` resuelve 0.0.1-rc.1 cuyos pares exigen core 0.0.1 y romperían.
+  for pkg in @deepseek-ai/dsh-subagent-codex@next @deepseek-ai/dsh-subagent-claude-code@next; do
+    dsh plugin --profile "$PROFILE_NAME" add "$pkg" </dev/null
+  done
+  dsh plugin --profile "$PROFILE_NAME" install </dev/null
+fi
 
 # ── 2. Política global (~/.dsh/AGENTS.md) ───────────────────────────────────
 AGENTS_TARGET="$DSH_HOME/AGENTS.md"
@@ -130,6 +145,43 @@ if $WITH_ENGRAM; then
     echo "ERROR: $PROFILE_PATCH tiene contenido propio y no puedo fusionarlo sin riesgo." >&2
     echo "  Añade manualmente el bloque de $REPO_ROOT/memory/engram.cordis.yml" >&2
     echo "  dentro de la lista YAML (mismo documento, sin separador ---)." >&2
+    exit 1
+  fi
+fi
+
+# ── 4b. Overlay de subagentes externos (opcional, --with-external-subagents) ─
+# Mismo patrón de fusión idempotente que el overlay Engram.
+EXTERNAL_BODY="# ── Subagentes externos (codex / claude-code) — gestionado por install.sh ──
+$(cat "$REPO_ROOT/memory/subagents-external.cordis.yml")
+"
+if $WITH_EXTERNAL_SUBAGENTS; then
+  if [ ! -f "$PROFILE_PATCH" ]; then
+    printf '%s\n' "$EXTERNAL_BODY" > "$PROFILE_PATCH"
+    echo "==> $PROFILE_PATCH creado con el overlay de subagentes externos"
+  elif grep -q "subagent-codex" "$PROFILE_PATCH"; then
+    echo "==> Overlay de subagentes externos ya habilitado en $PROFILE_PATCH"
+  elif grep -Eq '^[[:space:]]*\[[[:space:]]*\][[:space:]]*$' "$PROFILE_PATCH" \
+       && [ "$(grep -cv '^[[:space:]]*\(#.*\)\?[[:space:]]*$' "$PROFILE_PATCH")" -le 1 ]; then
+    printf '%s\n' "$EXTERNAL_BODY" > "$PROFILE_PATCH"
+    echo "==> Capa vacía reemplazada: overlay de subagentes externos instalado"
+  fi
+  # El caso "patch con contenido propio" lo resuelve 4c (append-and-verify).
+fi
+
+# ── 4c. Fusión append-and-verify para overlays sobre patch con contenido ────
+# Si el overlay externo sigue ausente pero el patch ya tiene filas propias
+# (p. ej. Engram), se hace APPEND textual al final del documento-lista con
+# backup y validación por composición; si la composición rompe, rollback.
+if $WITH_EXTERNAL_SUBAGENTS && ! grep -q "subagent-codex" "$PROFILE_PATCH" 2>/dev/null && [ -f "$PROFILE_PATCH" ]; then
+  BACKUP="$PROFILE_PATCH.backup.$(date +%Y%m%d-%H%M%S)"
+  cp "$PROFILE_PATCH" "$BACKUP"
+  printf '\n%s\n' "$EXTERNAL_BODY" >> "$PROFILE_PATCH"
+  if dsh --profile "$PROFILE_NAME" --dump-config >/dev/null 2>&1; then
+    echo "==> Overlay de subagentes externos añadido a $PROFILE_PATCH (composición validada)"
+  else
+    mv "$BACKUP" "$PROFILE_PATCH"
+    echo "ERROR: el append rompió la composición; patch restaurado desde $BACKUP." >&2
+    echo "  Fusiona manualmente memory/subagents-external.cordis.yml." >&2
     exit 1
   fi
 fi

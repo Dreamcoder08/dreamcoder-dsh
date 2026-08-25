@@ -1,0 +1,45 @@
+# Overlay de subagentes externos (codex / claude-code) para el perfil `engineering`.
+#
+# Los propios paquetes (@next = 0.1.1-rc.x) registran sus providers dormidos con
+# ids `subagent-codex` / `subagent-claude-code`; acá se SOBREESCRIBE su config
+# (reemplazo completo, sin deep-merge — el default `providerName` se conserva)
+# y se montan las tools de delegación. Requiere los paquetes instalados:
+#
+#   bash scripts/install.sh --with-external-subagents   # añade deps + este overlay
+#
+# Política de permisos deliberada (ni `never` ni bypass):
+#   - codex  → approve-for-me: workspace-write con revisión automática nativa.
+#     (el default del paquete es `never`: sandbox omitido — más débil).
+#   - claude → acceptEdits: acepta ediciones; el resto de prompts se deniegan.
+#     (el default del paquete es `dontAsk`).
+# El bypass (`dangerously-bypass-approvals-and-sandbox` / `bypassPermissions`)
+# existe upstream pero esta capa NO lo monta: sería P5 encubierto.
+#
+# Los procesos externos no arrancan hasta que una tool los invoca; quitar el
+# paquete retira el provider en el siguiente arranque del perfil.
+
+- id: subagent-codex
+  config:
+    permissionMode: approve-for-me
+
+- id: subagent-claude-code
+  config:
+    permissionMode: acceptEdits
+
+- insert:
+    # ── Tools de delegación (una por provider, toolName propio) ───────────
+    # maxDepth 'provider-managed': los providers externos carecen de la
+    # capacidad depthLimit y rechazan un cap numérico.
+    - id: tool-subagent-codex
+      name: '@deepseek-ai/dsh-tool-subagent'
+      config:
+        provider: codex
+        toolName: subagent_codex
+        maxDepth: provider-managed
+
+    - id: tool-subagent-claude-code
+      name: '@deepseek-ai/dsh-tool-subagent'
+      config:
+        provider: claude-code
+        toolName: subagent_claude_code
+        maxDepth: provider-managed

@@ -243,7 +243,7 @@ Fases implementadas:
 - **M6** revisión 4R con contexto fresco (presets reviewer/security).
 - **M7** evidence ledger con SHA256 derivado de Git.
 - **M8** context governor: presupuestos (política §7) + gate mecánico `scripts/context-governor.ts` con eventos `context:ok|warning|critical` y contratos por etapa en `contracts/` verificados contra los workflows.
-- **M9** model routing explícito (política §8 + skill `model-router`, ahora también routing por transporte; el doctor detecta providers externos).
+- **M9** model routing explícito (política §8 + skill `model-router`), con routing por transporte y **providers externos codex/claude-code operativos** (`bash scripts/install.sh --with-external-subagents`; delegación cross-engine verificada end-to-end vía codex).
 - **M10** observabilidad: `dream-doctor.sh` (9 secciones) + `dream-metrics.ts` (métricas de proceso desde recibos) + registros en `.evidence/`.
 - **M11** autonomía acotada: goals persistidos + jobs con límites duros (§9).
 
@@ -254,9 +254,6 @@ Pendiente conocido:
   evolución cuando DSH estabilice su API de plugins de terceros.
 - El routing por fase es hoy decisión declarada del orquestador; el pinning
   per-preset de modelo requiere cambios host-plane upstream.
-- Providers externos de subagente (codex, claude-code): sus paquetes `next`
-  exigen pares `^0.1.1-rc.x` y el core pineado es `0.1.0-rc.6`; quedan como
-  detección en el doctor hasta que la línea de versión sea compatible.
 
 ## Principios
 

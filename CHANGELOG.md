@@ -9,6 +9,14 @@ y el versionado respeta [Semantic Versioning](https://semver.org/lang/es/).
 
 ### Added
 
+- **Providers externos de subagente operativos** (codex / claude-code): core
+  actualizado a la línea 0.1.1-rc.x, `scripts/install.sh --with-external-subagents`
+  instala los paquetes pineados a `@next` y fusiona el overlay
+  `memory/subagents-external.cordis.yml` con append-and-verify (backup +
+  validación por composición). Política de permisos deliberada: codex
+  `approve-for-me`, claude `acceptEdits` — el bypass existe upstream y esta
+  capa NO lo monta. Delegación cross-engine verificada end-to-end en modo
+  headless (`dsh --profile eng-headless`).
 - Contratos por etapa machine-readable (`contracts/direct|mini-sdd|full-sdd.json`,
   schema `schemas/stage-contract.schema.json`): cada etapa de cada workflow declara
   inputs, outputs, criterios de salida, perfil de modelo, presupuesto de contexto
@@ -20,9 +28,10 @@ y el versionado respeta [Semantic Versioning](https://semver.org/lang/es/).
   con umbrales alineados a la compactación nativa (warning 0.80 / critical 0.92) y
   exit codes exclusivos componibles: `0` ok · `1` warning · `2` critical ·
   `3` sin datos · `4` uso inválido · `5` error de infra (14 tests).
-- Doctor (secciones 8–9): detección de proveedores de subagente — core spawn/fork
-  verificado, externos (codex, claude-code) detectados como condicionales a la versión
-  del core pineado, CLIs externas listadas; contratos validados en cada pasada.
+- Doctor (secciones 8–9): proveedores de subagente validados contra la
+  COMPOSICIÓN (`dsh --dump-config`, robusto ante cambios de layout pnpm/npm) —
+  core spawn/fork, externos codex/claude-code y CLIs; gate de Node ≥26;
+  contratos validados en cada pasada.
 - Skill `model-router`: tabla de routing por TRANSPORTE (spawn one-shot / fork
   continuable / provider externo condicional) junto a la tabla de modelos.
 - Política §7: la presión de contexto se mide con `scripts/context-governor.ts`

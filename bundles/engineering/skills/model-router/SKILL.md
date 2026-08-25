@@ -49,12 +49,13 @@ El transporte es parte del routing: se elige junto al modelo, con la misma regla
 |---|---|---|
 | `subagent` one-shot (spawn in-process) | tareas cortas y paralelas cuyo resultado cabe en un turno | exploraciones simultáneas de 2–3 módulos, checks puntuales |
 | `subagent_fork` continuable (fork in-process) | hijos que heredan contexto completado y siguen vivos entre turnos | tester/reviewer de una misión larga, iteración sobre el mismo diff |
-| provider externo (`codex`, `claude-code`) | SOLO si doctor los lista instalados y su versión es compatible con el core pineado | implementación delegada en otro motor, segunda opinión cross-engine |
+| `subagent_codex` (externo) | implementación delegada o segunda opinión cross-engine; requiere `--with-external-subagents` y auth nativa de Codex vigente | fix autocontenido en otro motor, contraste de veredicto técnico |
+| `subagent_claude_code` (externo) | igual que codex; requiere auth nativa de Claude vigente — si falla llega diagnóstico estructurado, nunca éxito falso | mismo uso |
 
 Reglas de transporte:
 
 1. Contexto fresco para review NO significa otro harness: significa un hijo sin las conclusiones del implementador. Un fork recién creado cumple; un spawn también.
-2. El proveedor externo es una dependencia versionada: instalarlo contra un core incompatible rompe la composición del perfil completa. Si el doctor reporta el paquete ausente o el par desalineado, la decisión correcta es spawn/fork + limitación declarada.
+2. Los providers externos corren con la política que esta capa monta (codex `approve-for-me`, claude `acceptEdits`). El bypass existe upstream y aquí NO se monta: sería P5 encubierto.
 3. Cada preset de rol (`agents/`) ya acota su superficie (sin escritura para explorer/reviewer/security, etc.). El transporte elegido no amplía esa superficie: un hijo externo recibe prompt autocontenido y devuelve texto, igual que uno interno.
 
 ## Output Contract

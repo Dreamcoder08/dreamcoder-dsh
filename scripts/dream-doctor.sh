@@ -86,21 +86,26 @@ else
 fi
 
 echo "── 8. Proveedores de subagente (routing multi-provider)"
-PROFILE_NM="$DSH_HOME/profiles/node_modules/@deepseek-ai"
-CORE_PROVIDERS="dsh-subagent-spawn-in-process dsh-subagent-fork-in-process dsh-tool-subagent"
-for p in $CORE_PROVIDERS; do
-  if [ -d "$PROFILE_NM/$p" ]; then ok "$p instalado"; else bad "falta $p (debería venir con dsh-base) — reinstala el perfil"; fi
-done
-# Externos: OPCIONALES y condicionales a la versión del core (los paquetes
-# next 0.1.1-rc.x exigen pares ^0.1.1-rc.x; el perfil pineado es 0.1.0-rc.6).
-# El doctor solo los DETECTA — jamás se simula un routing que no existe.
-for ext in dsh-subagent-codex dsh-subagent-claude-code; do
-  if [ -d "$PROFILE_NM/$ext" ]; then
-    ok "$ext instalado (routing externo disponible)"
-  else
-    info "$ext no instalado — routing externo condicional (requiere core 0.1.1-rc.x; ver skill model-router)"
-  fi
-done
+# Señal correcta: la COMPOSICIÓN (dsh --dump-config), no el layout de
+# node_modules — que varía entre layouts pnpm/npm y es un detalle interno.
+DUMP="$(dsh --profile "$PROFILE" --dump-config 2>/dev/null)"
+if [ -n "$DUMP" ]; then
+  for prov in spawn fork; do
+    if echo "$DUMP" | grep -q "providerName: $prov"; then ok "provider '$prov' compuesto"; else bad "falta el provider '$prov' (debería venir con dsh-base)"; fi
+  done
+  # Externos: OPCIONALES. Instalados vía `bash scripts/install.sh --with-external-subagents`
+  # (pin @next = 0.1.1-rc.x, compatible con el core moderno). El doctor solo
+  # DETECTA — jamás se simula un routing que no existe.
+  for ext in codex claude-code; do
+    if echo "$DUMP" | grep -q "providerName: $ext"; then
+      ok "provider externo '$ext' compuesto (routing disponible)"
+    else
+      info "provider externo '$ext' ausente — opcional: bash scripts/install.sh --with-external-subagents"
+    fi
+  done
+else
+  bad "no pude componer el perfil (dsh --dump-config falló) — ver sección 2"
+fi
 for cli in codex claude; do
   if command -v "$cli" >/dev/null 2>&1; then ok "CLI externa '$cli': $(command -v "$cli")"; else info "CLI '$cli' no instalada"; fi
 done
@@ -115,6 +120,14 @@ if [ -f "$REPO_ROOT/scripts/context-governor.ts" ]; then
   ok "context-governor disponible (gate de presión de contexto §7)"
 else
   bad "falta scripts/context-governor.ts"
+fi
+# Los scripts del repo usan type-stripping nativo (≥22.18) y los tests usan
+# node:test moderno; el gate exige ≥26 como el engines de package.json.
+NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
+if [ "${NODE_MAJOR:-0}" -ge 26 ]; then
+  ok "node ≥ 26 (type-stripping y node:test disponibles)"
+else
+  bad "node ${NODE_MAJOR:-?} < 26 — los scripts TS nativos pueden fallar; actualiza Node"
 fi
 if command -v node >/dev/null 2>&1 && node "$REPO_ROOT/scripts/verify-contracts.ts" >/dev/null 2>&1; then
   ok "contratos válidos y consistentes con workflows/ (verify-contracts)"
