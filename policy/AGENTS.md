@@ -139,7 +139,10 @@ Reglas operativas:
   vuelve al orquestador.
 - Ante presión de contexto, compactar ANTES de que la calidad degrade: cierra la unidad en curso,
   persiste por la puerta de memoria lo imprescindible (sección 6) y compacta; después re-ancla con
-  el objetivo y la evidencia ya publicada.
+  el objetivo y la evidencia ya publicada. La presión se mide, no se intuye:
+  `scripts/context-governor.ts` lee el uso real de la sesión y emite `context:ok`,
+  `context:warning` o `context:critical`; un `warning` obliga a cerrar la unidad en curso y un
+  `critical` a compactar ya (exit codes 0/1/2 como gate componible).
 - Una tarea que exige más contexto del disponible se divide en misiones encadenadas con recibos
   propios (`evidence-ledger`), no en un turno gigante.
 

@@ -8,6 +8,9 @@
 #   4. presets de agentes enlazados y componibles
 #   5. skills del bundle presentes
 #   6. memoria longitudinal opcional (engram) disponible
+#   7. evidencia reciente (.evidence/)
+#   8. proveedores de subagente (core instalados; externos opcionales detectados)
+#   9. contratos por etapa (contracts/ vs workflows/)
 #
 # Uso: bash scripts/dream-doctor.sh [--profile engineering]
 set -uo pipefail
@@ -34,7 +37,7 @@ if [ -f "$DSH_HOME/profiles/$PROFILE/package.json" ]; then
 else
   bad "perfil '$PROFILE' no instalado — ejecuta bash scripts/install.sh"
 fi
-DUMP="$(dsh --profile "$PROFILE" --dump-config 2>/dev/null)" && ok "composición del perfil genera (dsh --dump-config)" || { bad "la composición del perfil falla — corre bun run verify para el detalle"; }
+DUMP="$(dsh --profile "$PROFILE" --dump-config 2>/dev/null)" && ok "composición del perfil genera (dsh --dump-config)" || { bad "la composición del perfil falla — corre pnpm verify para el detalle"; }
 
 echo "── 3. Política global"
 TARGET="$DSH_HOME/AGENTS.md"
@@ -80,6 +83,43 @@ if [ -d .evidence ] && ls .evidence/* >/dev/null 2>&1; then
   ok "$(ls .evidence | wc -l) registro(s) de evidencia en $(pwd)/.evidence"
 else
   info "sin registros de evidencia en $(pwd)/.evidence todavía"
+fi
+
+echo "── 8. Proveedores de subagente (routing multi-provider)"
+PROFILE_NM="$DSH_HOME/profiles/node_modules/@deepseek-ai"
+CORE_PROVIDERS="dsh-subagent-spawn-in-process dsh-subagent-fork-in-process dsh-tool-subagent"
+for p in $CORE_PROVIDERS; do
+  if [ -d "$PROFILE_NM/$p" ]; then ok "$p instalado"; else bad "falta $p (debería venir con dsh-base) — reinstala el perfil"; fi
+done
+# Externos: OPCIONALES y condicionales a la versión del core (los paquetes
+# next 0.1.1-rc.x exigen pares ^0.1.1-rc.x; el perfil pineado es 0.1.0-rc.6).
+# El doctor solo los DETECTA — jamás se simula un routing que no existe.
+for ext in dsh-subagent-codex dsh-subagent-claude-code; do
+  if [ -d "$PROFILE_NM/$ext" ]; then
+    ok "$ext instalado (routing externo disponible)"
+  else
+    info "$ext no instalado — routing externo condicional (requiere core 0.1.1-rc.x; ver skill model-router)"
+  fi
+done
+for cli in codex claude; do
+  if command -v "$cli" >/dev/null 2>&1; then ok "CLI externa '$cli': $(command -v "$cli")"; else info "CLI '$cli' no instalada"; fi
+done
+
+echo "── 9. Contratos por etapa (SDD machine-readable)"
+if [ -f "$REPO_ROOT/contracts/full-sdd.json" ] && [ -f "$REPO_ROOT/schemas/stage-contract.schema.json" ]; then
+  ok "contracts/ + schema presentes ($(ls "$REPO_ROOT"/contracts/*.json 2>/dev/null | wc -l) contrato(s))"
+else
+  bad "falta contracts/ o schemas/stage-contract.schema.json en el repo"
+fi
+if [ -f "$REPO_ROOT/scripts/context-governor.ts" ]; then
+  ok "context-governor disponible (gate de presión de contexto §7)"
+else
+  bad "falta scripts/context-governor.ts"
+fi
+if command -v node >/dev/null 2>&1 && node "$REPO_ROOT/scripts/verify-contracts.ts" >/dev/null 2>&1; then
+  ok "contratos válidos y consistentes con workflows/ (verify-contracts)"
+else
+  bad "verify-contracts falla — corre node scripts/verify-contracts.ts para el detalle"
 fi
 
 echo
