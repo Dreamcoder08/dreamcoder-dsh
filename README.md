@@ -6,8 +6,8 @@
 [![Gentle-AI](https://img.shields.io/badge/Gentle--AI-ecosystem-ff69b4)](https://github.com/Gentleman-Programming/gentle-ai)
 [![inspired by gentle-pi](https://img.shields.io/badge/sibling-gentle--pi-6f42c1)](https://github.com/Gentleman-Programming/gentle-pi)
 [![DSH](https://img.shields.io/badge/DeepSeek%20Harness-out--of--tree%20bundle-00ADD8)](#arquitectura)
-[![bun](https://img.shields.io/badge/bun-%E2%89%A51.2-f472b6?logo=bun)](https://bun.sh)
-[![node](https://img.shields.io/badge/node-%E2%89%A522.18-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org)
+[![pnpm](https://img.shields.io/badge/pnpm-11.22.0-f69220?logo=pnpm)](https://pnpm.io)
+[![node](https://img.shields.io/badge/node-%E2%89%A526-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org)
 
 **Convierte DeepSeek Harness en un entorno de ingeniería disciplinado, sin tocar su core.**
 
@@ -101,13 +101,13 @@ Detalle completo en [`docs/architecture.md`](docs/architecture.md).
 Requisitos:
 
 - `dsh` + `pnpm` (instalación base de DeepSeek Harness)
-- [Bun](https://bun.sh) ≥ 1.2 para el tooling TypeScript nativo
-- Node ≥ 22.18
+- [pnpm](https://pnpm.io) 11.22.0 como gestor de paquetes único
+- Node ≥ 26 para el tooling TypeScript nativo
 - Opcional: binario `engram` v1.20.0 en PATH si vas a habilitar memoria
 
 ```bash
 git clone <este-repo> dreamcoder-dsh && cd dreamcoder-dsh
-bun install                             # dependencias de desarrollo (tsgo, @types/node)
+pnpm install                            # dependencias de desarrollo (tsgo, @types/node)
 
 bash scripts/install.sh                 # instala perfil, política y presets (idempotente)
 bash scripts/install.sh --with-engram   # además habilita memoria Engram (requiere binario)
@@ -142,11 +142,11 @@ Dentro de la sesión:
 Verificación del tooling sin instalar nada:
 
 ```bash
-bun run verify       # compone el perfil y valida presets (verify-compat + verify-presets)
-bun run typecheck    # tsgo 7.x (TypeScript nativo) sobre todo el tooling
+pnpm verify          # compone el perfil y valida presets (verify-compat + verify-presets)
+pnpm typecheck       # tsgo 7.x (TypeScript nativo) sobre todo el tooling
 ```
 
-Todo el tooling del bundle es TypeScript estricto ejecutado con Bun —TS nativo
+Todo el tooling del bundle es TypeScript estricto ejecutado con Node —TS nativo
 sin build step— tipado con la línea 7.x del compilador nativo
 (`@typescript/native-preview`, `tsgo`).
 
@@ -206,10 +206,10 @@ implementa / verifica es estructural, no disciplinaria:
 | `bash scripts/install.sh` | Instalación idempotente del perfil, política y presets |
 | `bash scripts/install.sh --with-engram` | Ídem + overlay de memoria Engram |
 | `bash scripts/dream-doctor.sh` | Salud de la instalación en 7 chequeos |
-| `bun run verify` | Compatibilidad contra DSH pineado + validación de presets |
-| `bun run typecheck` | `tsgo --noEmit` sobre todo el tooling |
-| `bun run scripts/red-green.ts` | Captura observable del ciclo RED→GREEN (exit 0 = ciclo válido) |
-| `bun run scripts/evidence-ledger.ts` | Receipt de misión derivado de Git con SHA256 de cierre |
+| `pnpm verify` | Compatibilidad contra DSH pineado + validación de presets |
+| `pnpm typecheck` | `tsgo --noEmit` sobre todo el tooling |
+| `node scripts/red-green.ts` | Captura observable del ciclo RED→GREEN (exit 0 = ciclo válido) |
+| `node scripts/evidence-ledger.ts` | Receipt de misión derivado de Git con SHA256 de cierre |
 
 ## Evidencia y receipts
 
@@ -242,9 +242,9 @@ Fases implementadas:
 - **M5** TDD con evidencia RED→GREEN observable.
 - **M6** revisión 4R con contexto fresco (presets reviewer/security).
 - **M7** evidence ledger con SHA256 derivado de Git.
-- **M8** context governor: presupuestos y compactación (política §7).
-- **M9** model routing explícito (política §8 + skill `model-router`).
-- **M10** observabilidad: `dream-doctor.sh` + `dream-metrics.ts` (métricas de proceso desde recibos) + registros en `.evidence/`.
+- **M8** context governor: presupuestos (política §7) + gate mecánico `scripts/context-governor.ts` con eventos `context:ok|warning|critical` y contratos por etapa en `contracts/` verificados contra los workflows.
+- **M9** model routing explícito (política §8 + skill `model-router`, ahora también routing por transporte; el doctor detecta providers externos).
+- **M10** observabilidad: `dream-doctor.sh` (9 secciones) + `dream-metrics.ts` (métricas de proceso desde recibos) + registros en `.evidence/`.
 - **M11** autonomía acotada: goals persistidos + jobs con límites duros (§9).
 
 Pendiente conocido:
@@ -254,6 +254,9 @@ Pendiente conocido:
   evolución cuando DSH estabilice su API de plugins de terceros.
 - El routing por fase es hoy decisión declarada del orquestador; el pinning
   per-preset de modelo requiere cambios host-plane upstream.
+- Providers externos de subagente (codex, claude-code): sus paquetes `next`
+  exigen pares `^0.1.1-rc.x` y el core pineado es `0.1.0-rc.6`; quedan como
+  detección en el doctor hasta que la línea de versión sea compatible.
 
 ## Principios
 
@@ -268,14 +271,14 @@ Pendiente conocido:
 ## Desarrollo
 
 ```bash
-bun install && bun run typecheck && bun run verify
+pnpm install && pnpm typecheck && pnpm test && pnpm verify
 ```
 
 La integración continua ([`.github/workflows/ci.yml`](.github/workflows/ci.yml))
 ejecuta dos jobs: `tooling` (gate duro: typecheck + integridad de enlaces y
 rutas de la documentación) y `composition` (best-effort: requiere una
 instalación local de `dsh`; el gate autoritativo sigue siendo tu máquina con
-`bun run verify` + `dream-doctor.sh`).
+`pnpm verify` + `dream-doctor.sh`).
 
 Para contribuir, lee [CONTRIBUTING.md](CONTRIBUTING.md). El historial de
 cambios vive en [CHANGELOG.md](CHANGELOG.md). Para proponer cambios upstream al

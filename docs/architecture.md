@@ -105,6 +105,23 @@ y `security` observan, planifican o emiten veredictos. La independencia de
 criterio no depende de que el modelo "sea honesto": depende de que el rol que
 implementa no tenga ni la herramienta ni la autoridad para aprobarse.
 
+## Contratos por etapa y gobernanza de contexto
+
+- `contracts/<workflow>.json` — cada etapa de `direct`, `mini-sdd` y `full-sdd`
+  declara inputs, outputs, criterios de salida, perfil de modelo, presupuesto de
+  contexto (franjas de la sección 7 de `policy/AGENTS.md`), tools permitidas y
+  política de memoria. El schema vive en
+  [`schemas/stage-contract.schema.json`](../schemas/stage-contract.schema.json).
+- `scripts/verify-contracts.ts` — valida los contratos contra el schema y cruza
+  cada etapa contra el encabezado real que ocupa en su documento de workflow:
+  contrato y documento no pueden derivar por separado.
+- `scripts/context-governor.ts` — mide la presión de contexto real (uso LLM del
+  session log) y emite `context:ok | context:warning | context:critical` a
+  `.evidence/context-events.jsonl`; los umbrales van alineados con la
+  compactación nativa para dejar margen a cerrar la unidad y persistir memoria.
+  La distribución por franjas sigue siendo política (sección 7); el gate global
+  es mecánico.
+
 ## Verificación: cómo se comprueba todo esto
 
 - `scripts/verify-compat.ts` — compone el perfil con el mismo algoritmo que el
@@ -112,11 +129,17 @@ implementa no tenga ni la herramienta ni la autoridad para aprobarse.
   antes de que lleguen a una sesión.
 - `scripts/verify-presets.ts` — valida cada preset: sintaxis YAML, forma de
   filas y resolución de paquetes desde el perfil instalado.
-- `scripts/dream-doctor.sh` — diagnóstico post-instalación (ver
+- `scripts/verify-contracts.ts` — contratos por etapa válidos y consistentes
+  con sus workflows (`pnpm verify` ejecuta los tres).
+- `scripts/dream-doctor.sh` — diagnóstico post-instalación, incluida la
+  detección de proveedores de subagente (core instalados vs externos
+  condicionales) y la validación de contratos (ver
   [`troubleshooting.md`](troubleshooting.md)).
 
 ## Evolución conocida
 
 Ver [Roadmap](../README.md#roadmap) en el README: receipts como plugin TS
-propio (cuando DSH estabilice su API de plugins de terceros) y pinning
-per-preset de modelo (requiere cambios host-plane upstream).
+propio (cuando DSH estabilice su API de plugins de terceros), pinning
+per-preset de modelo (requiere cambios host-plane upstream) y providers
+externos de subagente (codex, claude-code) cuando su línea de versión sea
+compatible con el core pineado — el doctor ya los detecta en cuanto lo sean.
