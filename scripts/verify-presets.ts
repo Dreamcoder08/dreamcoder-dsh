@@ -12,7 +12,7 @@
 // los detecta el audit de montaje de dsh-agent-presets al crear la sesión;
 // esta suite cubre la capa que falla antes: sintaxis y resolución.
 //
-// Se ejecuta con Bun (TS nativo, sin build) y se tipa con tsgo 7.x.
+// Se ejecuta con el type-stripping nativo de Node (≥26), sin build, y se tipa con tsgo 7.x.
 
 import { readFileSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'

@@ -8,17 +8,17 @@
 // ejecutados pueden demostrar.
 //
 // Uso:
-//   bun run scripts/evidence-ledger.ts \
+//   node scripts/evidence-ledger.ts \
 //     --mission feat-auth-refresh \
 //     --base 82ac31 \
 //     [--expected 9] \
-//     --check "unit tests" -- "bun test" \
-//     [--check "lint" -- "bun run lint"] ...
+//     --check "unit tests" -- "pnpm test" \
+//     [--check "lint" -- "pnpm lint"] ...
 //
 // Escribe .evidence/mission-<mission>-<ts>.yaml y su SHA256. Exit code 0 solo
 // si todas las verificaciones pasan y el conteo de archivos coincide.
 //
-// Se ejecuta con Bun (TS nativo, sin build) y se tipa con tsgo 7.x.
+// Se ejecuta con el type-stripping nativo de Node (≥26), sin build, y se tipa con tsgo 7.x.
 
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'

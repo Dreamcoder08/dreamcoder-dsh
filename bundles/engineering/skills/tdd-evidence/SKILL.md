@@ -37,10 +37,10 @@ El harness debe OBSERVAR el ciclo, no confiar en el relato del agente. El script
 
 ```bash
 # 1. Test que falla por la razón correcta:
-bun run <ruta-de-este-repo>/scripts/red-green.ts record-red -- <comando de test>
+node <ruta-de-este-repo>/scripts/red-green.ts record-red -- <comando de test>
 # 2. Edita el código (implementación mínima)...
 # 3. El mismo comando, ahora en verde:
-bun run <ruta-de-este-repo>/scripts/red-green.ts record-green -- <comando de test>
+node <ruta-de-este-repo>/scripts/red-green.ts record-green -- <comando de test>
 ```
 
 `record-red` rechaza un pase inicial (no hay comportamiento que probar) y `record-green` rechaza ejecutarse sin RED pendiente: no se puede cerrar un ciclo que nunca estuvo rojo. El JSON resultante es la evidencia citable en las fases RED/GREEN y la que `evidence-ledger` acepta en el cierre. Fases posteriores (TRIANGULATE, REFACTOR, VERIFY) se capturan manualmente según Execution Steps.
@@ -87,4 +87,4 @@ Cierra con un resumen: fases completadas, nº de tests añadidos y ruta de los a
 
 ## References
 
-Complementa a `workflow-router` (P1+ exige evidencia RED/GREEN) y alimenta a `evidence-ledger` en el cierre. Script de captura: `scripts/red-green.ts` (se ejecuta con Bun) en la raíz de este bundle-repo.
+Complementa a `workflow-router` (P1+ exige evidencia RED/GREEN) y alimenta a `evidence-ledger` en el cierre. Script de captura: `scripts/red-green.ts` (se ejecuta con Node) en la raíz de este bundle-repo.

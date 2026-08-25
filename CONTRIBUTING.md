@@ -42,13 +42,13 @@ descripción — reclasificar no es fracasar; ocultarlo sí.
 ## Verificación obligatoria antes del PR
 
 ```bash
-bun install
-bun run typecheck             # tsgo sobre todo el tooling
-bun run verify                # requiere instalación local de dsh + perfil
+pnpm install
+pnpm typecheck                # tsgo sobre todo el tooling
+pnpm verify                   # requiere instalación local de dsh + perfil
 bash scripts/dream-doctor.sh  # salud post-instalación, si tocaste install.sh
 ```
 
-`bun run verify` compone el perfil con el mismo algoritmo que el arranque real:
+`pnpm verify` compone el perfil con el mismo algoritmo que el arranque real:
 si pasa en tu máquina, el PR debería pasar el job best-effort de CI también.
 Incluye en la descripción del PR la salida relevante de los comandos — no un
 resumen verbal ("debería funcionar" es hipótesis, no resultado).

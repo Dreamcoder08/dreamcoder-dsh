@@ -7,7 +7,7 @@
 // existen con los contratos esperados. Un cambio upstream que rompa un id o
 // una config hace fallar esta suite ANTES de arrancar una sesión.
 //
-// Se ejecuta con Bun (TS nativo, sin build) y se tipa con tsgo 7.x.
+// Se ejecuta con el type-stripping nativo de Node (≥26), sin build, y se tipa con tsgo 7.x.
 
 import { spawnSync } from 'node:child_process'
 import { readFileSync, existsSync } from 'node:fs'

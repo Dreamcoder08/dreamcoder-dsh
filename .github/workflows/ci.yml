@@ -17,19 +17,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          bun-version: latest
+          node-version: 26
+          cache: pnpm
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Typecheck (tsgo)
-        run: bun run typecheck
+        run: pnpm typecheck
 
-      - name: Unit tests (bun test)
-        run: bun test
+      - name: Unit tests
+        run: pnpm test
 
       - name: Docs link and path integrity
         run: |
@@ -60,11 +64,11 @@ jobs:
           print('ALL OK')
           EOF
 
-  # La verificación de composición (bun run verify) necesita un `dsh` real y
+  # La verificación de composición (pnpm verify) necesita un `dsh` real y
   # el perfil instalado en DSH_HOME; no es reproducible en el runner estándar.
   # Se ejecuta best-effort para detectar rupturas obvias sin bloquear el gate
   # principal. El gate autoritativo sigue siendo la máquina con instalación
-  # local: bun run verify && bash scripts/dream-doctor.sh.
+  # local: pnpm verify && bash scripts/dream-doctor.sh.
   composition:
     name: Composition (best-effort, requires dsh)
     runs-on: ubuntu-latest
@@ -73,13 +77,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          bun-version: latest
+          node-version: 26
+          cache: pnpm
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Verify composition
-        run: bun run verify
+        run: pnpm verify

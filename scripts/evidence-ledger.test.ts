@@ -1,13 +1,14 @@
 // Characterization tests for scripts/evidence-ledger.ts — the Git-derived
 // mission receipt generator. Each test builds a throwaway Git repository so
 // receipts are computed against real diffs and real check commands.
-import { describe, expect, test } from 'bun:test'
+import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
+import { describe, test } from 'node:test'
 import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-const SCRIPT = join(import.meta.dir, 'evidence-ledger.ts')
+const SCRIPT = join(import.meta.dirname, 'evidence-ledger.ts')
 const RUNNER = process.execPath
 
 interface Repo {
@@ -57,16 +58,16 @@ describe('evidence-ledger.ts', () => {
       '--expected', '2',
       '--check', 'always ok', '--', RUNNER, '-e', 'process.exit(0)',
     ])
-    expect(r.status).toBe(0)
-    expect(r.stdout).toContain('PASS')
+    assert.equal(r.status, 0)
+    assert.match(r.stdout, /PASS/)
     const files = evidenceFiles(dir)
-    expect(files.length).toBe(1)
+    assert.equal(files.length, 1)
     const body = readFileSync(join(dir, '.evidence', files[0] as string), 'utf8')
-    expect(body).toContain('mission: feat-test')
-    expect(body).toContain('verdict: PASS')
-    expect(body).toMatch(/sha256: [0-9a-f]{64}/)
-    expect(body).toContain('scopeMatchesExpectation: true')
-    expect(body).toContain('baseIsAncestorOfCandidate: true')
+    assert.match(body, /mission: feat-test/)
+    assert.match(body, /verdict: PASS/)
+    assert.match(body, /sha256: [0-9a-f]{64}/)
+    assert.match(body, /scopeMatchesExpectation: true/)
+    assert.match(body, /baseIsAncestorOfCandidate: true/)
   })
 
   test('FAIL receipt when a verification command fails', () => {
@@ -77,9 +78,9 @@ describe('evidence-ledger.ts', () => {
       '--base', baseSha,
       '--check', 'doomed', '--', RUNNER, '-e', 'process.exit(1)',
     ])
-    expect(r.status).toBe(1)
+    assert.equal(r.status, 1)
     const body = readFileSync(join(dir, '.evidence', evidenceFiles(dir)[0] as string), 'utf8')
-    expect(body).toContain('verdict: FAIL')
+    assert.match(body, /verdict: FAIL/)
   })
 
   test('FAIL receipt when changed files exceed the expected scope', () => {
@@ -91,16 +92,16 @@ describe('evidence-ledger.ts', () => {
       '--expected', '5',
       '--check', 'ok', '--', RUNNER, '-e', 'process.exit(0)',
     ])
-    expect(r.status).toBe(1)
+    assert.equal(r.status, 1)
     const body = readFileSync(join(dir, '.evidence', evidenceFiles(dir)[0] as string), 'utf8')
-    expect(body).toContain('scopeMatchesExpectation: false')
-    expect(body).toContain('verdict: FAIL')
+    assert.match(body, /scopeMatchesExpectation: false/)
+    assert.match(body, /verdict: FAIL/)
   })
 
   test('missing --mission is rejected with a clear error', () => {
     const { dir, baseSha } = initRepo()
     const r = runLedger(dir, ['--base', baseSha])
-    expect(r.status).not.toBe(0)
-    expect(r.stderr).toContain('--mission es obligatorio')
+    assert.notEqual(r.status, 0)
+    assert.match(r.stderr, /--mission es obligatorio/)
   })
 })

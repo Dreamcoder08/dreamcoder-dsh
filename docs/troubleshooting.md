@@ -10,7 +10,7 @@ bash scripts/dream-doctor.sh
 
 Ejecuta siete chequeos en orden y marca cada línea con `✔` o `✘`:
 
-1. **Binarios** — `dsh`, `bun`, `node` presentes y en versión.
+1. **Binarios** — `dsh`, `pnpm`, `node` presentes y en versión.
 2. **Perfil instalado** — `$DSH_HOME/profiles/engineering/` existe y resuelve.
 3. **Política global** — `~/.dsh/AGENTS.md` instalado.
 4. **Presets de agentes** — los seis roles publicados en `.agent-presets/`.
@@ -51,13 +51,13 @@ este bundle debe restituirlos explícitamente. Diagnóstico:
 dsh --profile engineering --dump-config | less   # inspecciona la fila system-prompt
 ```
 
-`bun run verify` (verify-compat) compone el perfil con el mismo algoritmo que
+`pnpm verify` (verify-compat) compone el perfil con el mismo algoritmo que
 el arranque y detecta este tipo de ruptura contra la versión pineada de DSH.
 
 ### Un preset falla al cargar
 
 ```bash
-bun run scripts/verify-presets.ts
+node scripts/verify-presets.ts
 ```
 
 Valida sintaxis YAML, forma de filas y resolución de paquetes desde el perfil
@@ -70,7 +70,7 @@ El repo pinea la versión compatible de DSH. Tras una actualización de dsh:
 
 ```bash
 git pull                      # trae posibles re-pins del bundle
-bun run verify                # compatibilidad contra la versión pineada
+pnpm verify                   # compatibilidad contra la versión pineada
 ```
 
 Si `verify` falla con una versión nueva de DSH, el fix pertenece a este repo
@@ -87,8 +87,8 @@ el backup más reciente y re-ejecuta el doctor.
 Ante cualquier síntoma, la secuencia canónica es:
 
 ```bash
-bun run typecheck             # el tooling compila
-bun run verify                # la composición es válida
+pnpm typecheck                # el tooling compila
+pnpm verify                   # la composición es válida
 bash scripts/dream-doctor.sh  # la instalación está completa
 ```
 

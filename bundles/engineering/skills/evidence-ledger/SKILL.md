@@ -64,7 +64,7 @@ receipt_sha256: <rellenar al final>
 5. **Vía preferida — script del bundle** (deriva SHAs, diff y checks directamente de Git; el exit code 0 equivale a receipt `PASS`):
 
    ```bash
-   bun run <ruta-de-este-repo>/scripts/evidence-ledger.ts \
+   node <ruta-de-este-repo>/scripts/evidence-ledger.ts \
      --mission <id> --base <sha_base> [--expected <n>] \
      --check "unit tests" -- "<comando de test>" \
      --check "lint" -- "<comando de lint>"

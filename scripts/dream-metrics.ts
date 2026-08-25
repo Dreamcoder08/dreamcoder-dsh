@@ -6,12 +6,12 @@
 // No opina sobre trabajo "hecho": solo agrega lo que los recibos DEMUESTRAN.
 //
 // Uso:
-//   bun run scripts/dream-metrics.ts [--evidence-dir <dir>] [--json]
+//   node scripts/dream-metrics.ts [--evidence-dir <dir>] [--json]
 //
 // Exit code siempre 0 si la ejecución fue correcta: es una herramienta de
 // reporte, no una verificación.
 //
-// Se ejecuta con Bun o con type-stripping nativo de Node (≥22.18): sin build ni
+// Se ejecuta con el type-stripping nativo de Node (≥26): sin build ni
 // dependencias de runtime. Solo sintaxis erasable. Todo el cálculo de tasas es
 // aritmética entera exacta (BigInt), sin coma flotante.
 
