@@ -194,7 +194,9 @@ const measureSession = (sessionPath: string): MeasureOutcome => {
     const tmpOut = join(tmpdir(), `dsh-governor-${process.pid}-${Date.now()}.out`)
     let fd: number | null = null
     try {
-      fd = openSync(tmpOut, 'w')
+      // Flag 'wx' (O_EXCL): falla si el path ya existe — un symlink
+      // pre-colocado por otro usuario no puede desviar esta escritura.
+      fd = openSync(tmpOut, 'wx')
       const r = spawnSync('zstd', ['-dc', zstdPath], { stdio: ['ignore', fd, 'pipe'] })
       if (r.error !== undefined || r.status !== 0) {
         const why =

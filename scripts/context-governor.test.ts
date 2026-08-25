@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { describe, test } from 'node:test'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -29,6 +29,9 @@ const newSession = (root: string, name: string, inputs: number[]): string => {
 }
 
 const newRoot = (): string => mkdtempSync(join(tmpdir(), 'dsh-governor-'))
+
+/** El camino feliz zstd requiere el binario; si falta, el test se salta. */
+const HAS_ZSTD = spawnSync('zstd', ['--version'], { encoding: 'utf8' }).status === 0
 
 const run = (args: readonly string[]) =>
   spawnSync(RUNNER, [SCRIPT, ...args], { encoding: 'utf8' })
@@ -190,5 +193,24 @@ describe('context-governor.ts', () => {
     const r = run(['--sessions-dir', root, '--evidence-dir', root])
     assert.equal(r.status, 1) // midió session-with-log (warning), no cayó en exit 3
     assert.match(r.stdout, /session-with-log/)
+  })
+
+  test('happy path: a compressed .zstd log is measured through the streaming path', { skip: !HAS_ZSTD }, () => {
+    const root = newRoot()
+    const name = newSession(root, 'session-zstd', [64000]) // ratio 0.5 → ok
+    // Comprimir el log plano como hace DSH (.zstd, extensión no estándar de
+    // zstd — hay que pasarla explícita) y retirar el plano: solo queda .zstd.
+    const plain = join(root, name, 'session.jsonl')
+    const c = spawnSync('zstd', ['-f', '-o', join(root, name, 'session.jsonl.zstd'), plain], {
+      encoding: 'utf8',
+    })
+    assert.equal(c.status, 0, c.stderr)
+    unlinkSync(plain)
+    assert.ok(existsSync(join(root, name, 'session.jsonl.zstd')))
+    const r = run(['--sessions-dir', root, '--evidence-dir', root, '--json'])
+    assert.equal(r.status, 0, r.stderr)
+    const evt = JSON.parse(r.stdout) as { event: string; tokens: number }
+    assert.equal(evt.event, 'context:ok')
+    assert.equal(evt.tokens, 64000)
   })
 })
