@@ -48,3 +48,7 @@ Más: exit codes, resumen de salidas de test, diff stat, lista de desvíos y rie
 
 Criterio de cierre: todas las unidades commiteadas, verificación independiente en verde con
 evidencia publicada y desvíos declarados. Con eso, el workflow termina.
+
+## Contrato machine-readable
+
+Las etapas de este workflow tienen contrato verificable en `contracts/mini-sdd.json` (schema: `schemas/stage-contract.schema.json`). El cruce contrato↔documento lo valida `bun run scripts/verify-contracts.ts` — parte del gate `bun run verify`. Si este documento y el contrato divergen, la verificación falla: arregla la fuente de deriva, no el verificador.

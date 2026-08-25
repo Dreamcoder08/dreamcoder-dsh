@@ -1,0 +1,84 @@
+{
+  "$schema": "../schemas/stage-contract.schema.json",
+  "workflow": "direct",
+  "risk": ["P0", "P1"],
+  "doc": "../workflows/direct.md",
+  "context_budget_ref": "policy/AGENTS.md#7-gobernanza-de-contexto",
+  "stages": [
+    {
+      "id": "understand",
+      "heading": "Understand",
+      "executes": "orquestador",
+      "inputs": [
+        "petición del humano con objetivo en una frase",
+        "archivos afectados y sus llamadores directos (leídos, no presumidos)"
+      ],
+      "outputs": [
+        "enunciado del comportamiento esperado en una frase",
+        "clasificación P0/P1 registrada"
+      ],
+      "exit_criteria": [
+        "los archivos afectados fueron leídos antes de editar",
+        "el comportamiento esperado está enunciado y es observable"
+      ],
+      "model_profile": { "role": "orquestador", "compute": "session", "fresh_context": false },
+      "token_budget": { "franja": "codigo-y-contexto", "fraction": 0.3 },
+      "allowed_tools": ["fs.read", "fs.search", "web.search"],
+      "memory_policy": "orquestador-recupera"
+    },
+    {
+      "id": "change",
+      "heading": "Change",
+      "executes": "orquestador",
+      "inputs": ["enunciado del comportamiento esperado", "diff mínimo identificado"],
+      "outputs": [
+        "cambio editado solo donde pide la tarea",
+        "en P1: test nuevo que ejerce el cambio, junto al cambio"
+      ],
+      "exit_criteria": [
+        "sin refactor incidental fuera de alcance",
+        "en P1 el par cambio+test viaja junto"
+      ],
+      "model_profile": { "role": "orquestador", "compute": "session", "fresh_context": false },
+      "token_budget": { "franja": "artefactos-de-tarea", "fraction": 0.2 },
+      "allowed_tools": ["fs.read", "fs.write"],
+      "memory_policy": "ninguna"
+    },
+    {
+      "id": "verify",
+      "heading": "Verify",
+      "executes": "comando determinista o subagente tester",
+      "inputs": ["cambio aplicado", "test nuevo (P1) o verificación mínima pertinente (P0)"],
+      "outputs": [
+        "registro comando + salida relevante + exit code",
+        "en P1 cuando sea barato: evidencia del rojo previo al fix"
+      ],
+      "exit_criteria": [
+        "exit code observado, nunca presumido",
+        "P1: el test pasó en esta ejecución"
+      ],
+      "model_profile": { "role": "tester", "compute": "fast", "fresh_context": true },
+      "token_budget": { "franja": "observaciones-de-tools", "fraction": 0.15 },
+      "allowed_tools": ["bash.safe", "fs.read"],
+      "memory_policy": "ninguna"
+    },
+    {
+      "id": "summarize",
+      "heading": "Summarize",
+      "executes": "orquestador",
+      "inputs": ["diff final", "evidencia de verificación"],
+      "outputs": [
+        "resumen 3–5 líneas: alcance, qué NO cambió, verificación, riesgo residual",
+        "git diff --stat publicado; diff completo bajo demanda"
+      ],
+      "exit_criteria": [
+        "toda afirmación 'hecho/funciona' respaldada por evidencia adjunta",
+        "ninguna operación por encima de P2 EXECUTE-SAFE"
+      ],
+      "model_profile": { "role": "orquestador", "compute": "session", "fresh_context": false },
+      "token_budget": { "franja": "artefactos-de-tarea", "fraction": 0.2 },
+      "allowed_tools": ["fs.read", "bash.safe"],
+      "memory_policy": "persistir-cierre"
+    }
+  ]
+}

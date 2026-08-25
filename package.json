@@ -4,18 +4,17 @@
   "private": true,
   "description": "Dreamcoder engineering operating layer (Gentle-AI philosophy) as a DeepSeek Harness out-of-tree bundle + profile",
   "type": "module",
-  "packageManager": "bun@1.4.0",
+  "packageManager": "pnpm@11.22.0",
   "engines": {
-    "node": ">=22.18",
-    "bun": ">=1.2"
+    "node": ">=26"
   },
   "scripts": {
     "install:dsh": "bash scripts/install.sh",
     "typecheck": "tsgo --noEmit",
-    "verify": "bun run scripts/verify-compat.ts && bun run scripts/verify-presets.ts"
+    "test": "node --test 'scripts/*.test.ts'",
+    "verify": "node scripts/verify-compat.ts && node scripts/verify-presets.ts && node scripts/verify-contracts.ts"
   },
   "devDependencies": {
-    "@types/bun": "^1.4.0",
     "@types/node": "^26.3.0",
     "@typescript/native-preview": "^7.0.0-dev.20260707.2"
   }

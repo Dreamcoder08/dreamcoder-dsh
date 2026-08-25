@@ -64,3 +64,7 @@ aprueba gates, archiva y es el único rol que recupera memoria (`policy/AGENTS.m
 - **Inputs**: todos los artefactos de las etapas anteriores.
 - **Outputs**: spec/design/tasks archivados junto al proyecto; entradas de memoria dignas de persistencia; registro de lecciones.
 - **Exit criteria**: un lector nuevo puede reconstruir qué se decidió, por qué y cómo se verificó, sin acceso a esta conversación.
+
+## Contrato machine-readable
+
+Las etapas de este workflow tienen contrato verificable en `contracts/full-sdd.json` (schema: `schemas/stage-contract.schema.json`). El cruce contrato↔documento lo valida `bun run scripts/verify-contracts.ts` — parte del gate `bun run verify`. Si este documento y el contrato divergen, la verificación falla: arregla la fuente de deriva, no el verificador.

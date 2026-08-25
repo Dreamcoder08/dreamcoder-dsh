@@ -1,0 +1,98 @@
+{
+  "$schema": "../schemas/stage-contract.schema.json",
+  "workflow": "mini-sdd",
+  "risk": ["P2"],
+  "doc": "../workflows/mini-sdd.md",
+  "context_budget_ref": "policy/AGENTS.md#7-gobernanza-de-contexto",
+  "stages": [
+    {
+      "id": "propuesta",
+      "heading": "Propuesta breve",
+      "executes": "orquestador",
+      "inputs": [
+        "objetivo observable en 1–2 frases",
+        "terreno leído: módulos afectados y contratos que toca el cambio"
+      ],
+      "outputs": [
+        "documento ≤1 pantalla: objetivo, alcance (dentro/fuera), archivos esperados, plan de tests"
+      ],
+      "exit_criteria": [
+        "los archivos esperados se enuncian como lista, declarando lo incierto como tal",
+        "el plan de tests nombra pruebas concretas (unitarias/integración y casos límite)"
+      ],
+      "model_profile": { "role": "architect", "compute": "capable", "fresh_context": false },
+      "token_budget": { "franja": "codigo-y-contexto", "fraction": 0.3 },
+      "allowed_tools": ["fs.read", "fs.search", "web.search"],
+      "memory_policy": "orquestador-recupera"
+    },
+    {
+      "id": "confirmacion",
+      "heading": "Confirmación",
+      "executes": "humano u orquestador",
+      "inputs": ["propuesta breve presentada"],
+      "outputs": ["sí explícito registrado ('OK', 'adelante'); preguntas cuentan como no-confirmadas"],
+      "exit_criteria": [
+        "ninguna implementación sin confirmación explícita",
+        "si el alcance cambia a mitad de camino: delta re-propuesto antes de continuar"
+      ],
+      "model_profile": { "role": "humano", "compute": "session", "fresh_context": false },
+      "token_budget": { "franja": "identidad+reglas", "fraction": 0.1 },
+      "allowed_tools": ["ask-user"],
+      "memory_policy": "ninguna"
+    },
+    {
+      "id": "implementacion",
+      "heading": "Implementación por unidades de trabajo",
+      "executes": "implementer",
+      "inputs": ["propuesta confirmada", "lista de unidades commiteables ordenada"],
+      "outputs": [
+        "un commit por unidad: compila, pasa sus tests y deja el sistema usable",
+        "notas de desviación por unidad; bugs ajenos corregidos en commit propio"
+      ],
+      "exit_criteria": [
+        "orden típico respetado: contratos/tipos → implementación → integración/wiring",
+        "tests y docs viajan con su código; ningún commit mezcla unidad con fix ajeno"
+      ],
+      "model_profile": { "role": "implementer", "compute": "capable", "fresh_context": false },
+      "token_budget": { "franja": "artefactos-de-tarea", "fraction": 0.2 },
+      "allowed_tools": ["fs.read", "fs.write", "bash.safe", "todo"],
+      "memory_policy": "ninguna"
+    },
+    {
+      "id": "verificacion-independiente",
+      "heading": "Verificación independiente",
+      "executes": "tester (agente o proceso distinto del implementador)",
+      "inputs": ["diff completo", "suite de tests", "propuesta como checklist"],
+      "outputs": [
+        "suite completa (tests, lint, build) con comandos, salidas y exit codes",
+        "comparación archivos esperados vs. tocados; checklist del plan de tests marcado"
+      ],
+      "exit_criteria": [
+        "quien implementa no verifica: contexto fresco obligatorio",
+        "cada desviación respecto a la propuesta listada, ninguna disimulada"
+      ],
+      "model_profile": { "role": "tester", "compute": "fresh-reviewer", "fresh_context": true },
+      "token_budget": { "franja": "observaciones-de-tools", "fraction": 0.15 },
+      "allowed_tools": ["bash.safe", "fs.read", "subagent.fork"],
+      "memory_policy": "ninguna"
+    },
+    {
+      "id": "resumen-evidencia",
+      "heading": "Resumen de evidencia",
+      "executes": "orquestador",
+      "inputs": ["commits por unidad", "evidencia de verificación independiente"],
+      "outputs": [
+        "tabla unidad/commit/verificación/resultado",
+        "exit codes, diff stat, desvíos y riesgo residual; recibo evidence-ledger para la misión"
+      ],
+      "exit_criteria": [
+        "todas las unidades commiteadas con verificación independiente en verde",
+        "desvíos declarados; sin recibo la misión no está completa"
+      ],
+      "model_profile": { "role": "orquestador", "compute": "session", "fresh_context": false },
+      "token_budget": { "franja": "artefactos-de-tarea", "fraction": 0.2 },
+      "allowed_tools": ["fs.read", "bash.safe"],
+      "memory_policy": "persistir-cierre"
+    }
+  ]
+}

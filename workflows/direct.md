@@ -45,3 +45,7 @@ Reportar qué cambió, qué NO cambió, cómo se verificó y qué riesgo residua
 3. Resumen de 3–5 líneas: alcance, verificación, riesgo residual.
 
 Si algún criterio falla, el workflow no terminó: volver al paso correspondiente.
+
+## Contrato machine-readable
+
+Las etapas de este workflow tienen contrato verificable en `contracts/direct.json` (schema: `schemas/stage-contract.schema.json`). El cruce contrato↔documento lo valida `bun run scripts/verify-contracts.ts` — parte del gate `bun run verify`. Si este documento y el contrato divergen, la verificación falla: arregla la fuente de deriva, no el verificador.

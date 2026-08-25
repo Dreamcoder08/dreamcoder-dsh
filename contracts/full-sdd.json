@@ -1,0 +1,167 @@
+{
+  "$schema": "../schemas/stage-contract.schema.json",
+  "workflow": "full-sdd",
+  "risk": ["P3"],
+  "doc": "../workflows/full-sdd.md",
+  "context_budget_ref": "policy/AGENTS.md#7-gobernanza-de-contexto",
+  "stages": [
+    {
+      "id": "explore",
+      "heading": "explore — explorer",
+      "executes": "explorer",
+      "inputs": [
+        "objetivo de la misión",
+        "estado actual del repo (leído, no presumido)",
+        "memoria recuperada e inyectada por el orquestador"
+      ],
+      "outputs": [
+        "mapa del terreno: módulos afectados, restricciones, alternativas descartadas con motivo"
+      ],
+      "exit_criteria": [
+        "todo módulo afectado fue leído con evidencia citada",
+        "cero suposiciones sin marcar como tales"
+      ],
+      "model_profile": { "role": "explorer", "compute": "fast", "fresh_context": true },
+      "token_budget": { "franja": "codigo-y-contexto", "fraction": 0.3 },
+      "allowed_tools": ["fs.read", "fs.search", "web.search"],
+      "memory_policy": "ninguna"
+    },
+    {
+      "id": "proposal",
+      "heading": "proposal — architect",
+      "executes": "architect",
+      "inputs": ["hallazgos de explore"],
+      "outputs": [
+        "propuesta ~1 página: problema, ≥2 opciones con tradeoffs, recomendación, impacto y riesgos"
+      ],
+      "exit_criteria": [
+        "aprobación humana explícita de la dirección; sin ella no hay spec"
+      ],
+      "model_profile": { "role": "architect", "compute": "capable", "fresh_context": false },
+      "token_budget": { "franja": "artefactos-de-tarea", "fraction": 0.2 },
+      "allowed_tools": ["fs.read", "plan-mode", "ask-user"],
+      "memory_policy": "orquestador-recupera"
+    },
+    {
+      "id": "spec",
+      "heading": "spec — architect",
+      "executes": "architect",
+      "inputs": ["propuesta aprobada"],
+      "outputs": [
+        "requisitos numerados con criterio de aceptación observable",
+        "contratos públicos propuestos (firmas, schemas, códigos de error) y política de compatibilidad/migración"
+      ],
+      "exit_criteria": [
+        "cada requisito tiene criterio de aceptación observable",
+        "sin ambigüedad ni 'etc.'"
+      ],
+      "model_profile": { "role": "architect", "compute": "capable", "fresh_context": false },
+      "token_budget": { "franja": "artefactos-de-tarea", "fraction": 0.2 },
+      "allowed_tools": ["fs.read", "plan-mode"],
+      "memory_policy": "orquestador-recupera"
+    },
+    {
+      "id": "design",
+      "heading": "design — architect diseña; reviewer revisa",
+      "executes": "architect (+reviewer)",
+      "inputs": ["spec aprobada"],
+      "outputs": [
+        "componentes y responsabilidades, flujo de datos, plan de migración y rollback, riesgos con mitigación"
+      ],
+      "exit_criteria": [
+        "revisión de diseño por reviewer con contexto fresco",
+        "objeciones resueltas o registradas como decisiones aceptadas"
+      ],
+      "model_profile": { "role": "reviewer", "compute": "fresh-reviewer", "fresh_context": true },
+      "token_budget": { "franja": "artefactos-de-tarea", "fraction": 0.2 },
+      "allowed_tools": ["fs.read", "plan-mode", "subagent.fork"],
+      "memory_policy": "ninguna"
+    },
+    {
+      "id": "tasks",
+      "heading": "tasks — architect; orquestador valida",
+      "executes": "architect (+orquestador)",
+      "inputs": ["design aprobado"],
+      "outputs": [
+        "lista ordenada de unidades commiteables: archivos, tests y dependencias de cada una"
+      ],
+      "exit_criteria": [
+        "trazabilidad completa requisito ↔ unidad: la suma cubre la spec y nada extra"
+      ],
+      "model_profile": { "role": "architect", "compute": "capable", "fresh_context": false },
+      "token_budget": { "franja": "artefactos-de-tarea", "fraction": 0.2 },
+      "allowed_tools": ["fs.read", "todo"],
+      "memory_policy": "ninguna"
+    },
+    {
+      "id": "apply",
+      "heading": "apply — implementer",
+      "executes": "implementer",
+      "inputs": ["lista de tareas validada por el orquestador"],
+      "outputs": [
+        "un commit por unidad (compila + tests de la unidad en verde)",
+        "notas de desviación por unidad"
+      ],
+      "exit_criteria": [
+        "todas las unidades aplicadas, o bloqueo documentado con evidencia",
+        "prohibido introducir contratos ausentes de spec/design: toda necesidad nueva escala al architect"
+      ],
+      "model_profile": { "role": "implementer", "compute": "capable", "fresh_context": false },
+      "token_budget": { "franja": "observaciones-de-tools", "fraction": 0.15 },
+      "allowed_tools": ["fs.read", "fs.write", "bash.safe", "todo"],
+      "memory_policy": "ninguna"
+    },
+    {
+      "id": "verify",
+      "heading": "verify — tester (contexto fresco; no fue el implementador)",
+      "executes": "tester",
+      "inputs": ["diff completo", "suite de tests", "spec numerada"],
+      "outputs": [
+        "suite completa con exit codes; tests nuevos vistos fallar y luego pasar",
+        "checklist requisito → evidencia"
+      ],
+      "exit_criteria": [
+        "100% de requisitos con evidencia, o excepción aprobada explícitamente por el humano"
+      ],
+      "model_profile": { "role": "tester", "compute": "fresh-reviewer", "fresh_context": true },
+      "token_budget": { "franja": "observaciones-de-tools", "fraction": 0.15 },
+      "allowed_tools": ["bash.safe", "fs.read", "subagent.fork"],
+      "memory_policy": "ninguna"
+    },
+    {
+      "id": "review",
+      "heading": "review — reviewer + security (contexto fresco, independientes entre sí)",
+      "executes": "reviewer + security",
+      "inputs": ["diff", "evidencia de verify", "spec", "design"],
+      "outputs": [
+        "veredicto separado por revisor: aprobar o cambios requeridos (lista concreta)",
+        "security cubre superficie de ataque, secretos, permisos y reversibilidad de la migración"
+      ],
+      "exit_criteria": [
+        "cero comentarios bloqueantes pendientes",
+        "operaciones P5 restantes con aprobación humana propia"
+      ],
+      "model_profile": { "role": "reviewer+security", "compute": "fresh-reviewer", "fresh_context": true },
+      "token_budget": { "franja": "observaciones-de-tools", "fraction": 0.15 },
+      "allowed_tools": ["fs.read", "bash.safe", "subagent.fork"],
+      "memory_policy": "ninguna"
+    },
+    {
+      "id": "archive",
+      "heading": "archive — orquestador",
+      "executes": "orquestador",
+      "inputs": ["todos los artefactos de las etapas anteriores"],
+      "outputs": [
+        "spec/design/tasks archivados junto al proyecto",
+        "recibo evidence-ledger publicado; entradas de memoria y registro de lecciones"
+      ],
+      "exit_criteria": [
+        "un lector nuevo puede reconstruir qué se decidió, por qué y cómo se verificó, sin acceso a esta conversación"
+      ],
+      "model_profile": { "role": "orquestador", "compute": "session", "fresh_context": false },
+      "token_budget": { "franja": "reserva-de-seguridad", "fraction": 0.1 },
+      "allowed_tools": ["fs.read", "fs.write", "bash.safe"],
+      "memory_policy": "persistir-cierre"
+    }
+  ]
+}

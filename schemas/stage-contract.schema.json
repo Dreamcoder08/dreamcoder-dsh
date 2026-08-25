@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dreamcoder.dev/schemas/stage-contract.schema.json",
+  "title": "Stage Contract",
+  "description": "Contrato machine-readable de las etapas de un workflow Dreamcoder (direct, mini-sdd, full-sdd). Cada etapa declara entradas, salidas, criterios de salida, perfil de cómputo, presupuesto de contexto (franjas de policy/AGENTS.md §7), herramientas permitidas y política de memoria. Validado estructuralmente por scripts/verify-contracts.ts (validador propio sin dependencias) y por cualquier validador JSON Schema externo.",
+  "type": "object",
+  "required": ["$schema", "workflow", "risk", "doc", "context_budget_ref", "stages"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "workflow": {
+      "type": "string",
+      "enum": ["direct", "mini-sdd", "full-sdd"]
+    },
+    "risk": {
+      "description": "Niveles de riesgo P0–P3 que este workflow atiende.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "enum": ["P0", "P1", "P2", "P3"] }
+    },
+    "doc": {
+      "description": "Documento humano autoritativo del workflow (ruta relativa a contracts/). El verificador cruza etapas del contrato contra encabezados reales del documento.",
+      "type": "string"
+    },
+    "context_budget_ref": {
+      "description": "Referencia normativa del presupuesto de contexto (sección de policy/AGENTS.md).",
+      "type": "string",
+      "const": "policy/AGENTS.md#7-gobernanza-de-contexto"
+    },
+    "stages": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/stage" }
+    }
+  },
+  "$defs": {
+    "stage": {
+      "type": "object",
+      "required": [
+        "id",
+        "heading",
+        "executes",
+        "inputs",
+        "outputs",
+        "exit_criteria",
+        "model_profile",
+        "token_budget",
+        "allowed_tools",
+        "memory_policy"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "Identificador kebab-case de la etapa.",
+          "type": "string",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+        },
+        "heading": {
+          "description": "Encabezado literal que esta etapa ocupa en el documento del workflow; el verificador lo busca en el doc para detectar deriva contrato↔documento.",
+          "type": "string",
+          "minLength": 3
+        },
+        "executes": {
+          "description": "Rol que ejecuta la etapa (preset de agents/, u 'orquestador'/'humano').",
+          "type": "string",
+          "minLength": 3
+        },
+        "inputs": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 3 } },
+        "outputs": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 3 } },
+        "exit_criteria": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 3 } },
+        "model_profile": {
+          "type": "object",
+          "required": ["role", "compute", "fresh_context"],
+          "additionalProperties": false,
+          "properties": {
+            "role": { "type": "string", "minLength": 3 },
+            "compute": {
+              "description": "Perfil de cómputo según skill model-router: capable (arquitectura/implementación P2–P3), fast (exploración/investigación), fresh-reviewer (revisión con contexto fresco), session (la sesión en curso).",
+              "type": "string",
+              "enum": ["capable", "fast", "fresh-reviewer", "session"]
+            },
+            "fresh_context": { "type": "boolean" }
+          }
+        },
+        "token_budget": {
+          "type": "object",
+          "required": ["franja", "fraction"],
+          "additionalProperties": false,
+          "properties": {
+            "franja": {
+              "description": "Franja dominante del presupuesto §7 que consume la etapa.",
+              "type": "string",
+              "enum": [
+                "identidad+reglas",
+                "memoria",
+                "codigo-y-contexto",
+                "artefactos-de-tarea",
+                "observaciones-de-tools",
+                "reserva-de-seguridad"
+              ]
+            },
+            "fraction": {
+              "description": "Techo de la fracción del presupuesto total de misión que puede consumir la etapa (0<f<=1).",
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        "allowed_tools": {
+          "description": "Superficie de tools permitida en la etapa; 'bash.safe' implica máximo permiso P2 EXECUTE-SAFE.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 2 }
+        },
+        "memory_policy": {
+          "description": "orquestador-recupera: solo el orquestador lee/escribe memoria; persistir-cierre: además persiste decisiones al cerrar; ninguna: etapa sin acceso a memoria.",
+          "type": "string",
+          "enum": ["orquestador-recupera", "persistir-cierre", "ninguna"]
+        }
+      }
+    }
+  }
+}
