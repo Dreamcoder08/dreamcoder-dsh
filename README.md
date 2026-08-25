@@ -1,4 +1,5 @@
 # Dreamcoder DSH
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/e0a8ec6a-b6ce-4c81-9794-8a5a647f41b7" />
 
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 [![CI](https://img.shields.io/github/actions/workflow/status/Dreamcoder08/dreamcoder-dsh/ci.yml?branch=main&label=CI)](https://github.com/Dreamcoder08/dreamcoder-dsh/actions/workflows/ci.yml)
