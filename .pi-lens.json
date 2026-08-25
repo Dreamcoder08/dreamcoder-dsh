@@ -1,0 +1,10 @@
+{
+  "rules": {
+    "JSONPatch:0": {
+      "disable": true
+    },
+    "JSONPatch:513": {
+      "disable": true
+    }
+  }
+}

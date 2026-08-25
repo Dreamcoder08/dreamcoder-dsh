@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=../../schemas/cordis-patch.schema.json
 # =============================================================================
 # cordis.patch.yml — Bundle @dreamcoder/dsh-engineering-bundle
 #
@@ -92,6 +93,21 @@
 
       - Mantén el español como idioma operativo y un registro técnico sobrio en
       toda comunicación.
+
+# -----------------------------------------------------------------------------
+# Override 2 — compaction-basic (@deepseek-ai/dsh-compaction-basic).
+# Enforcement real de la política §7/§8: la compactación automática por presión
+# es nativa; acá fijamos `auto: true` explícito y routemos la sumarización al
+# modelo económico del perfil, para que el routing de modelos por rol no dependa
+# de que el agente lo recuerde. La config reemplaza la fila completa (no hay
+# deep-merge); los campos no listados usan sus defaults nativos (thresholdRatio
+# 0.8, retainRatio 0.16), coherentes con la reserva de seguridad de §7.
+# -----------------------------------------------------------------------------
+- id: compaction-basic
+  config:
+    auto: true
+    summarizationProvider: opencode
+    summarizationModel: deepseek-v4-flash-free
 
 # -----------------------------------------------------------------------------
 # NOTA — skills del bundle.

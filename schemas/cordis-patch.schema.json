@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DSH cordis patch entries",
+  "description": "Permissive schema for DeepSeek Harness cordis.patch.yml: an array of PatchOptions rows selected by id, with optional config/name/disable fields. Prevents generic JSON Patch schema inference.",
+  "type": ["array", "null"],
+  "items": {
+    "type": "object",
+    "properties": {
+      "id": { "type": "string" },
+      "name": { "type": "string" },
+      "disable": { "type": "boolean" },
+      "config": { "type": "object" },
+      "insert": { "type": "array" }
+    },
+    "required": ["id"]
+  }
+}
