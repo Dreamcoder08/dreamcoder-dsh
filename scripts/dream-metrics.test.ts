@@ -43,7 +43,7 @@ const runMetrics = (cwd: string, args: string[] = []) =>
 
 const SHA = 'a'.repeat(64)
 
-const missionYaml = (mission: string, verdict: 'PASS' | 'FAIL', recordedAt = ['2026-08-25T00:00:00', '000Z'].join('.')) =>
+const missionYaml = (mission: string, verdict: 'PASS' | 'FAIL', recordedAt = '2026-08-25T00:00:00.000Z') =>
   [
     '# Evidence receipt — generado por scripts/evidence-ledger.ts',
     `mission: ${mission}`,
@@ -74,7 +74,7 @@ describe('dream-metrics.ts', () => {
     const ev = join(ws, '.evidence')
     mkdirSync(ev)
     writeFileSync(join(ev, 'mission-alpha-1.yaml'), missionYaml('alpha', 'PASS'))
-    writeFileSync(join(ev, 'mission-beta-2.yaml'), missionYaml('beta', 'FAIL', ['2026-08-25T12:00:00', '000Z'].join('.')))
+    writeFileSync(join(ev, 'mission-beta-2.yaml'), missionYaml('beta', 'FAIL', '2026-08-25T12:00:00.000Z'))
     writeFileSync(
       join(ev, 'red-green-111.json'),
       JSON.stringify({ cycle: 'VALID', red: {}, green: {} }),
@@ -90,7 +90,7 @@ describe('dream-metrics.ts', () => {
     assert.equal(out.missions.total, 2)
     assert.equal(out.missions.pass, 1)
     assert.equal(out.missions.fail, 1)
-    if (out.missions.passRate !== Buffer.from('NTAuMCU=', 'base64').toString()) {
+    if (out.missions.passRate !== '50.0%') {
       throw new Error('unexpected mission pass rate')
     }
     assert.equal(out.tdd.cycles, 2)

@@ -41,6 +41,8 @@ import {
   readdirSync,
   readFileSync,
   readSync,
+  renameSync,
+  rmSync,
   statSync,
   unlinkSync,
 } from 'node:fs'
@@ -287,9 +289,19 @@ const event: GovernorEvent = {
 }
 
 // ── Registro duradero (.evidence/context-events.jsonl) ───────────────────────
+// Techo de crecimiento: si el registro supera MAX_EVENT_BYTES, se rota a
+// context-events.1.jsonl (se descarta el rotation anterior). Un gate que
+// crece sin límite deja de ser mantenimiento seguro.
+const MAX_EVENT_BYTES = 4 * 1024 * 1024
+const eventsPath = join(evidenceDir, 'context-events.jsonl')
 try {
   mkdirSync(evidenceDir, { recursive: true })
-  appendFileSync(join(evidenceDir, 'context-events.jsonl'), JSON.stringify(event) + '\n')
+  if (existsSync(eventsPath) && statSync(eventsPath).size > MAX_EVENT_BYTES) {
+    const rotated = join(evidenceDir, 'context-events.1.jsonl')
+    rmSync(rotated, { force: true })
+    renameSync(eventsPath, rotated)
+  }
+  appendFileSync(eventsPath, JSON.stringify(event) + '\n')
 } catch (e) {
   // Sin registro no hay evidencia duradera: se señala, jamás se calla.
   console.error(`AVISO: no se pudo escribir el evento en ${evidenceDir}: ${String(e)}`)
