@@ -28,6 +28,9 @@ jobs:
       - name: Typecheck (tsgo)
         run: bun run typecheck
 
+      - name: Unit tests (bun test)
+        run: bun test
+
       - name: Docs link and path integrity
         run: |
           python3 - <<'EOF'
