@@ -1,0 +1,12 @@
+{
+  "name": "@dreamcoder/dsh-engineering-bundle",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Bundle DSH del proyecto Dreamcoder: contrato de persona Gentle-AI para ingeniería y registro de skills propias.",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

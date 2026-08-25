@@ -1,0 +1,16 @@
+{
+  "name": "dsh-profile-engineering",
+  "private": true,
+  "dependencies": {
+    "@dreamcoder/dsh-engineering-bundle": "link:@BUNDLE_DIR@"
+  },
+  "dsh": {
+    "profile": {
+      "bundles": [
+        "@deepseek-ai/dsh-base",
+        "@deepseek-ai/dsh-web-app",
+        "@dreamcoder/dsh-engineering-bundle"
+      ]
+    }
+  }
+}

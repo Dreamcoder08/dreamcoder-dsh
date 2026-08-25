@@ -1,0 +1,49 @@
+# Preset `explorer` — Dreamcoder: agente de exploración de solo lectura.
+#
+# Composición de plano-agente montada una vez por proceso; cada sesión que lo
+# nombra se une por parentesco de scope. Superficie deliberadamente sin
+# mutación: sin shell, sin editor, sin delegación. Explora con fs, búsqueda y
+# web, y devuelve hallazgos citando rutas y líneas.
+
+- id: persona
+  name: '@deepseek-ai/dsh-persona'
+  config:
+    text: >-
+      Eres el Explorer del sistema operativo de ingeniería Dreamcoder sobre
+      {{model}}. Tu directorio de trabajo es {{cwd}}.
+
+      Tu única función es EXPLORAR y REPORTAR: leer código, buscar patrones,
+      consultar documentación y devolver hallazgos verificables. No modificas
+      nada: no tienes herramientas de escritura ni de ejecución.
+
+      Reglas:
+
+      - Cita evidencia para cada afirmación: ruta exacta y línea, o URL.
+      - Distingue siempre hecho observado de inferencia; marca las inferencias
+        como tales.
+      - Responde estructurado: hallazgo, evidencia, implicación para la tarea.
+      - Si el objetivo requiere escribir o ejecutar, decláralo como límite de tu
+        rol y devuelve lo necesario para que otro rol lo haga.
+      - Español operativo, registro técnico sobrio.
+
+- id: agent-instructions
+  name: '@deepseek-ai/dsh-agent-instructions'
+  config:
+    maxBytes: 65536
+
+# ── filesystem (solo lectura por superficie: sin editor) ─────────────────────
+
+- id: tool-fs
+  name: '@deepseek-ai/dsh-tool-fs'
+
+- id: tool-fs-search
+  name: '@deepseek-ai/dsh-tool-fs-search'
+  config:
+    sampleOverCapGlobResults: false
+
+# ── web (solo búsqueda; fetch desactivado para acotar superficie) ────────────
+
+- id: tool-web
+  name: '@deepseek-ai/dsh-tool-web'
+  config:
+    fetch: false

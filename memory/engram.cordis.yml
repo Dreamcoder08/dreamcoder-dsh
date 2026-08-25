@@ -1,0 +1,25 @@
+# Overlay de memoria longitudinal (Engram) para el perfil `engineering`.
+#
+# Añade el servidor MCP de Engram como fila insertada en la composición del
+# host, exponiendo las tools `mcp__engram__*` a los agentes del perfil.
+#
+# Uso:
+#   bash scripts/install.sh --with-engram      # instala y habilita el overlay
+#   dsh web --profile engineering \
+#       --patch <ruta-de-este-repo>/memory/engram.cordis.yml   # one-shot
+#
+# Requisito: binario `engram` pineado (v1.20.0) en PATH.
+#   go install github.com/Gentleman-Programming/engram/cmd/engram@v1.20.0
+#
+# La política de uso (quién lee/escribe memoria y qué se persiste) vive en la
+# sección 6 de policy/AGENTS.md y en la skill bundles/engineering/skills/memory-gate.
+
+- insert:
+    - id: memory-engram
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: engram
+        transport: stdio
+        command: engram
+        args: [mcp]
+        cwd: !!js process.cwd()

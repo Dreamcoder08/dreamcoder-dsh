@@ -1,0 +1,2 @@
+name: Explorer
+description: Agente de exploración de solo lectura — lee código, busca patrones y reporta hallazgos con evidencia; sin shell ni escritura.

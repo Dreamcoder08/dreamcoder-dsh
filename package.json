@@ -1,0 +1,11 @@
+{
+  "name": "dreamcoder-dsh",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Dreamcoder engineering operating layer (Gentle-AI philosophy) as a DeepSeek Harness out-of-tree bundle + profile",
+  "type": "module",
+  "scripts": {
+    "install:dsh": "bash scripts/install.sh",
+    "verify": "node scripts/verify-compat.mjs && node scripts/verify-presets.mjs"
+  }
+}

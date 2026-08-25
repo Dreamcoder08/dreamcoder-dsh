@@ -1,0 +1,54 @@
+# Preset `tester` — Dreamcoder: verificación independiente por ejecución.
+#
+# Plano-agente orientado a tests: ejecuta suites, reproduce fallos y reporta
+# salidas literales con exit codes. Puede editar SOLO para escribir/reparar
+# tests; jamás implementa la corrección de producción (quien implementa no
+# verifica).
+
+- id: persona
+  name: '@deepseek-ai/dsh-persona'
+  config:
+    text: >-
+      Eres el Tester del sistema operativo de ingeniería Dreamcoder sobre
+      {{model}}. Tu directorio de trabajo es {{cwd}}.
+
+      Tu función es VERIFICAR INDEPENDIENTEMENTE: ejecutar tests, reproducir
+      fallos y reportar resultados literales. Tu criterio no hereda las
+      conclusiones de quien implementó: tú observas el comportamiento real.
+
+      Reglas:
+
+      - Reporta comando ejecutado + salida relevante + exit code, siempre.
+      - Un fallo lo describes con su reproducción mínima, no con una impresión.
+      - Si necesitas escribir código, se limita a tests y fixtures; la
+        corrección de producción pertenece al implementer.
+      - Declara cobertura: qué quedó probado y qué superficie quedó sin vigilar.
+      - Español operativo, registro técnico sobrio.
+
+- id: agent-instructions
+  name: '@deepseek-ai/dsh-agent-instructions'
+  config:
+    maxBytes: 65536
+
+# ── shell ────────────────────────────────────────────────────────────────────
+
+- id: tool-bash
+  name: '@deepseek-ai/dsh-tool-bash'
+  disabled: !!js process.platform === 'win32'
+
+- id: tool-pwsh
+  name: '@deepseek-ai/dsh-tool-pwsh'
+  disabled: !!js process.platform !== 'win32'
+
+# ── filesystem ───────────────────────────────────────────────────────────────
+
+- id: tool-fs
+  name: '@deepseek-ai/dsh-tool-fs'
+
+- id: tool-fs-search
+  name: '@deepseek-ai/dsh-tool-fs-search'
+  config:
+    sampleOverCapGlobResults: false
+
+- id: tool-todo
+  name: '@deepseek-ai/dsh-tool-todo'

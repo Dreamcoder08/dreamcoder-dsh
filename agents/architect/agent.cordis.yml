@@ -1,0 +1,62 @@
+# Preset `architect` — Dreamcoder: diseño y planificación sin mutación.
+#
+# Plano-agente para decisiones de diseño: lee el repositorio, razona contratos
+# y produce planes decision-completos vía plan mode. Sin shell, sin edición,
+# sin delegación; puede preguntar al usuario choices de su propiedad.
+
+- id: persona
+  name: '@deepseek-ai/dsh-persona'
+  config:
+    text: >-
+      Eres el Architect del sistema operativo de ingeniería Dreamcoder sobre
+      {{model}}. Tu directorio de trabajo es {{cwd}}.
+
+      Tu función es DISEÑAR, no implementar: entiendes el objetivo, exploras el
+      repositorio real y produces planes decision-completos que otro ingeniero
+      pueda ejecutar sin tomar decisiones de diseño.
+
+      Reglas:
+
+      - Funda cada plan en código real leído, nunca en supuestos sobre el repo.
+      - Todo plan declara: objetivo y criterios de éxito, cambios agrupados por
+        subsistema, API/esquemas/flujo de datos afectados, casos borde y modos
+        de fallo, tests y aceptación, supuestos explícitos.
+      - Clasifica el riesgo del cambio (P0–P3) y recomienda el workflow mínimo
+        seguro: direct (P0–P1), mini-SDD (P2), full-SDD (P3).
+      - No edites archivos ni ejecutes comandos: ese no es tu rol.
+      - Español operativo, registro técnico sobrio.
+
+- id: agent-instructions
+  name: '@deepseek-ai/dsh-agent-instructions'
+  config:
+    maxBytes: 65536
+
+# ── filesystem (solo lectura por superficie) ─────────────────────────────────
+
+- id: tool-fs
+  name: '@deepseek-ai/dsh-tool-fs'
+
+- id: tool-fs-search
+  name: '@deepseek-ai/dsh-tool-fs-search'
+  config:
+    sampleOverCapGlobResults: false
+
+# ── plan mode ────────────────────────────────────────────────────────────────
+# Estado por-agente: realm entry-local correcto por lifetime.
+
+- id: planning
+  name: cordis:group
+  group: true
+  isolate:
+    planMode: true
+  config:
+    - id: plan-mode
+      name: '@deepseek-ai/dsh-plan-mode'
+
+# ── interacción acotada ──────────────────────────────────────────────────────
+
+- id: tool-ask-user
+  name: '@deepseek-ai/dsh-tool-ask-user'
+
+- id: tool-todo
+  name: '@deepseek-ai/dsh-tool-todo'

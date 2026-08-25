@@ -1,0 +1,85 @@
+# Preset `implementer` — Dreamcoder: el único rol que implementa.
+#
+# Plano-agente completo de ejecución para cambios acotados: shell, filesystem,
+# jobs en segundo plano y compaction. Sin herramientas de delegación ni de
+# pregunta al usuario: esas decisiones suben al orquestador. El implementer
+# jamás se autoaprueba: la verificación pertenece a tester/reviewer.
+
+- id: persona
+  name: '@deepseek-ai/dsh-persona'
+  config:
+    text: >-
+      Eres el Implementer del sistema operativo de ingeniería Dreamcoder sobre
+      {{model}}. Tu directorio de trabajo es {{cwd}}.
+
+      Tu función es IMPLEMENTAR el cambio más pequeño que cumple el objetivo
+      recibido, en unidades verificables. Recibes un prompt autocontenible:
+      trabaja SOLO con lo que fue inyectado; no asumas contexto que no te fue
+      dado.
+
+      Reglas:
+
+      - Cambio acotado: ningún refactor incidental fuera del alcance declarado.
+      - Sigue TDD cuando aplique: test que falle primero (RED), implementación
+        mínima (GREEN), luego refactor; publica la evidencia de ambos pasos.
+      - Ejecuta tests y build antes de declarar nada terminado; reporta comando
+        + salida relevante + exit code.
+      - No te apruebes a ti mismo: termina tu turno entregando diff y evidencia;
+        la verificación independiente corresponde a otro rol.
+      - Si el objetivo es ambiguo o el alcance crece, detente y repórtalo; no
+        inventes requisitos.
+      - Español operativo, registro técnico sobrio.
+
+- id: agent-instructions
+  name: '@deepseek-ai/dsh-agent-instructions'
+  config:
+    maxBytes: 65536
+
+# ── shell ────────────────────────────────────────────────────────────────────
+
+- id: tool-bash
+  name: '@deepseek-ai/dsh-tool-bash'
+  disabled: !!js process.platform === 'win32'
+
+- id: tool-pwsh
+  name: '@deepseek-ai/dsh-tool-pwsh'
+  disabled: !!js process.platform !== 'win32'
+
+# ── filesystem ───────────────────────────────────────────────────────────────
+
+- id: tool-fs
+  name: '@deepseek-ai/dsh-tool-fs'
+
+- id: tool-fs-search
+  name: '@deepseek-ai/dsh-tool-fs-search'
+  config:
+    sampleOverCapGlobResults: false
+
+# ── background jobs ──────────────────────────────────────────────────────────
+# Solo los controles model-facing; el registry vive en el host.
+
+- id: tool-jobs
+  name: '@deepseek-ai/dsh-tool-jobs'
+
+# ── compaction ───────────────────────────────────────────────────────────────
+# `compaction-basic` lee `toolResultPrune` vía ctx.get: el pruner comparte realm.
+
+- id: compaction
+  name: cordis:group
+  group: true
+  isolate:
+    compaction: true
+    toolResultPruner: true
+  config:
+    - id: compaction-basic
+      name: '@deepseek-ai/dsh-compaction-basic'
+
+    - id: tool-result-pruner
+      name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+      config:
+        thresholdChars: 8192
+        headChars: 4096
+        tailChars: 1024
+
+- id: tool-todo
+  name: '@deepseek-ai/dsh-tool-todo'
