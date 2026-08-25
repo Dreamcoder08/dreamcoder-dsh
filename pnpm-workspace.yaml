@@ -1,0 +1,8 @@
+# Workspace boundary: este repo es su propia raíz pnpm. Sin este archivo,
+# pnpm resuelve hacia el workspace padre (~/$HOME) y mezcla dependencias
+# ajenas (misma razón por la que scripts/install.sh aísla el perfil DSH).
+packages:
+  - .
+# Herramientas puras de desarrollo (tsgo/@types): ningún postinstall
+# legítimo que aprobar; la política explícita evita el fallo ruidoso.
+onlyBuiltDependencies: []
