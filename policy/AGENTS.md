@@ -160,3 +160,16 @@ humano para toda operación P4/P5 o decisión no contemplada, y `blocked` honest
 repetidos. Autonomía es control verificado, no ausencia de supervisión. Mecánica: skill
 `autonomous-mission`.
 
+## 10. Carga de skills con ranking
+
+Las skills son contexto y el contexto es presupuesto (sección 7): nunca se cargan todas.
+
+- Antes de cargar, la tarea actual se contrasta contra `description` y `whenToUse` de cada skill
+  disponible y se puntúa su relevancia para ESTA fase del workflow.
+- Se cargan como máximo las tres más relevantes; a igualdad de relevancia gana la más específica
+  (alcance más acotado).
+- Una skill pertinente solo para una fase posterior se difiere hasta entrar en esa fase; no se
+  precarga "por si acaso".
+- Si ninguna skill supera el umbral de relevancia clara, se declara "sin skill aplicable" en una
+  línea y se procede sin ellas; cargar por completitud es desperdicio, no rigor.
+
