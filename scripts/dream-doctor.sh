@@ -56,15 +56,12 @@ for preset_dir in "$REPO_ROOT"/agents/*/; do
 done
 
 echo "── 5. Skills del bundle"
+SKILLS_USER_DIR="${DSH_HOME:-$HOME/.dsh}/skills"
 for skill in workflow-router tdd-evidence review-4r evidence-ledger memory-gate model-router autonomous-mission; do
   f="$REPO_ROOT/bundles/engineering/skills/$skill/SKILL.md"
-  [ -f "$f" ] && ok "skill $skill" || bad "skill $skill ausente"
+  [ -f "$f" ] && ok "skill $skill en el repo" || bad "skill $skill ausente"
+  [ -e "$SKILLS_USER_DIR/$skill/SKILL.md" ] && ok "skill $skill visible en $SKILLS_USER_DIR" || bad "skill $skill NO enlazada en $SKILLS_USER_DIR (reinstala)"
 done
-if printf '%s' "$DUMP" | grep -q "$REPO_ROOT/bundles/engineering/skills"; then
-  ok "customSkillDirs registradas en la composición"
-else
-  bad "las skills del bundle no aparecen en la composición"
-fi
 
 echo "── 6. Memoria longitudinal (opcional)"
 if command -v engram >/dev/null 2>&1; then
