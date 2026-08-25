@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  tooling:
+    name: Tooling (typecheck + docs integrity)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck (tsgo)
+        run: bun run typecheck
+
+      - name: Docs link and path integrity
+        run: |
+          python3 - <<'EOF'
+          import re, os, glob, sys
+          errors = []
+          md_files = ['README.md'] + glob.glob('docs/*.md')
+          for f in md_files:
+              text = open(f).read()
+              for m in re.finditer(r'\]\(([^)#]+?)(#[^)]*)?\)', text):
+                  target = m.group(1)
+                  if target.startswith(('http', 'mailto')):
+                      continue
+                  p = os.path.normpath(os.path.join(os.path.dirname(f), target))
+                  if not os.path.exists(p):
+                      errors.append(f'{f}: broken link -> {target}')
+              for m in set(re.findall(
+                  r'`((?:bundles|agents|workflows|policy|memory|profiles|scripts|docs)/[A-Za-z0-9_./-]+)`',
+                  text,
+              )):
+                  if not os.path.exists(m.rstrip('/')):
+                      errors.append(f'{f}: missing path -> {m}')
+          if errors:
+              print('ERRORS:')
+              for e in errors:
+                  print(' -', e)
+              sys.exit(1)
+          print('ALL OK')
+          EOF
+
+  # La verificación de composición (bun run verify) necesita un `dsh` real y
+  # el perfil instalado en DSH_HOME; no es reproducible en el runner estándar.
+  # Se ejecuta best-effort para detectar rupturas obvias sin bloquear el gate
+  # principal. El gate autoritativo sigue siendo la máquina con instalación
+  # local: bun run verify && bash scripts/dream-doctor.sh.
+  composition:
+    name: Composition (best-effort, requires dsh)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Verify composition
+        run: bun run verify

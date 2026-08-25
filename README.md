@@ -1,6 +1,8 @@
 # Dreamcoder DSH
 
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/Dreamcoder08/dreamcoder-dsh/ci.yml?branch=main&label=CI)](https://github.com/Dreamcoder08/dreamcoder-dsh/actions/workflows/ci.yml)
+[![GitHub stars](https://img.shields.io/github/stars/Dreamcoder08/dreamcoder-dsh?style=flat&color=yellow)](https://github.com/Dreamcoder08/dreamcoder-dsh/stargazers)
 [![Gentle-AI](https://img.shields.io/badge/Gentle--AI-ecosystem-ff69b4)](https://github.com/Gentleman-Programming/gentle-ai)
 [![inspired by gentle-pi](https://img.shields.io/badge/sibling-gentle--pi-6f42c1)](https://github.com/Gentleman-Programming/gentle-pi)
 [![DSH](https://img.shields.io/badge/DeepSeek%20Harness-out--of--tree%20bundle-00ADD8)](#arquitectura)
@@ -269,7 +271,15 @@ Pendiente conocido:
 bun install && bun run typecheck && bun run verify
 ```
 
-Para contribuir upstream al ecosistema Gentle-AI (issue-first):
+La integración continua ([`.github/workflows/ci.yml`](.github/workflows/ci.yml))
+ejecuta dos jobs: `tooling` (gate duro: typecheck + integridad de enlaces y
+rutas de la documentación) y `composition` (best-effort: requiere una
+instalación local de `dsh`; el gate autoritativo sigue siendo tu máquina con
+`bun run verify` + `dream-doctor.sh`).
+
+Para contribuir, lee [CONTRIBUTING.md](CONTRIBUTING.md). El historial de
+cambios vive en [CHANGELOG.md](CHANGELOG.md). Para proponer cambios upstream al
+ecosistema Gentle-AI (issue-first):
 [`docs/contribution-gentle-ai.md`](docs/contribution-gentle-ai.md) ·
 [versión en inglés](docs/contribution-gentle-ai.en.md).
 
