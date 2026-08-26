@@ -111,6 +111,47 @@ export function runJourney(j: Journey): JourneyResult {
   return { id: j.id, title: j.title, axis: j.axis, status: 'completed' }
 }
 
+/** Args aceptados por el runner. `only` null = corpus completo. */
+export interface BenchArgs {
+  only: Set<string> | null
+  list: boolean
+  json: boolean
+}
+
+export type ParsedArgs =
+  | { ok: true; args: BenchArgs }
+  | { ok: false; code: number; message: string }
+
+/** Parseo puro de argv — testeable sin ejecutar journeys. Exit 4 = uso inválido. */
+export function parseArgs(argv: readonly string[]): ParsedArgs {
+  const args: BenchArgs = { only: null, list: false, json: false }
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i]
+    if (a === '--only') {
+      const raw = argv[++i] ?? ''
+      const ids = raw.split(',').map((s) => s.trim()).filter((s) => s !== '')
+      if (ids.length === 0) {
+        return { ok: false, code: 4, message: 'Argumento inválido: --only requiere ids separados por coma' }
+      }
+      args.only = new Set(ids)
+    } else if (a === '--list') {
+      args.list = true
+    } else if (a === '--json') {
+      args.json = true
+    } else {
+      return { ok: false, code: 4, message: `Argumento desconocido: ${String(a)}` }
+    }
+  }
+  return { ok: true, args }
+}
+
+/** Listado legible del corpus para --list (no ejecuta nada). */
+export function formatList(list: readonly Journey[]): string {
+  return list
+    .map((j) => `${j.id}  [${j.axis}]  ${j.title} — ${j.why} (${j.steps.length} step(s))`)
+    .join('\n')
+}
+
 function writeReceipt(results: JourneyResult[], completed: number, failed: number): void {
   mkdirSync(EVIDENCE_DIR, { recursive: true })
   const receipt = {
@@ -131,33 +172,26 @@ function writeReceipt(results: JourneyResult[], completed: number, failed: numbe
 }
 
 function main(argv: readonly string[]): number {
-  // --only <id,id,…>: subconjunto de journeys para entornos sin dependencias
-  // de host (p. ej. CI corre j1-j3; j4-j6 necesitan dsh/DSH_HOME real).
-  let only: Set<string> | null = null
-  for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === '--only') {
-      const raw = argv[++i] ?? ''
-      only = new Set(
-        raw
-          .split(',')
-          .map((s) => s.trim())
-          .filter((s) => s !== ''),
-      )
-      if (only.size === 0) {
-        console.error('Argumento inválido: --only requiere ids separados por coma')
-        return 4
-      }
-    } else {
-      console.error(`Argumento desconocido: ${String(argv[i])}`)
-      return 4
-    }
+  // --only <id,id,…>: subconjunto para entornos sin dependencias de host.
+  // --list: muestra el corpus y sale (no ejecuta journeys).
+  // --json: stdout es UN objeto JSON machine-readable (resultados por journey).
+  const parsed = parseArgs(argv)
+  if (!parsed.ok) {
+    console.error(parsed.message)
+    return parsed.code
   }
+  const { only, list, json } = parsed.args
 
   const declarationErrors = validateCorpus(journeys)
   if (declarationErrors.length > 0) {
     console.error('✘ corpus inválido (declaraciones):')
     for (const e of declarationErrors) console.error(`  - ${e}`)
     return 2
+  }
+
+  if (list) {
+    console.log(formatList(journeys))
+    return 0
   }
 
   const selected = only === null ? journeys : journeys.filter((j) => only.has(j.id))
@@ -170,18 +204,33 @@ function main(argv: readonly string[]): number {
   for (const j of selected) {
     const r = runJourney(j)
     results.push(r)
-    const mark = r.status === 'completed' ? '✔' : '✘'
-    console.log(`${mark} ${r.id} ${r.title}${r.status === 'failed' ? `\n    paso: ${r.failedStep}\n    ${r.detail}` : ''}`)
+    if (!json) {
+      const mark = r.status === 'completed' ? '✔' : '✘'
+      console.log(`${mark} ${r.id} ${r.title}${r.status === 'failed' ? `\n    paso: ${r.failedStep}\n    ${r.detail}` : ''}`)
+    }
   }
 
   const completed = results.filter((r) => r.status === 'completed').length
   const failed = results.length - completed
   const skipped = journeys.length - results.length
-  console.log('')
-  console.log(
-    `bench driven: ${completed} completado(s) / ${failed} fallido(s) / ${skipped} omitido(s) — corpus ${journeys.length} journey(s)` +
-      (skipped > 0 ? ` (corrida parcial: ${results.map((r) => r.id).join(',')})` : ''),
-  )
+  if (json) {
+    const payload = {
+      kind: 'dream-bench',
+      drivenMode: true,
+      runId: RUN_ID,
+      corpusSize: journeys.length,
+      partial: skipped > 0,
+      totals: { completed, failed, skipped },
+      journeys: results,
+    }
+    console.log(JSON.stringify(payload))
+  } else {
+    console.log('')
+    console.log(
+      `bench driven: ${completed} completado(s) / ${failed} fallido(s) / ${skipped} omitido(s) — corpus ${journeys.length} journey(s)` +
+        (skipped > 0 ? ` (corrida parcial: ${results.map((r) => r.id).join(',')})` : ''),
+    )
+  }
   writeReceipt(results, completed, failed)
   return failed === 0 ? 0 : 1
 }

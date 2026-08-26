@@ -1,4 +1,5 @@
 # Dreamcoder DSH
+
 <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/e0a8ec6a-b6ce-4c81-9794-8a5a647f41b7" />
 
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
@@ -17,6 +18,11 @@ out-of-tree*: un pipeline de diez etapas obligatorias, clasificación de riesgo
 P0–P3 antes de tocar código, subagentes con roles separados (quien implementa
 jamás se autoaprueba), TDD con evidencia observable, receipts derivados de Git,
 presupuestos de contexto, routing explícito de modelos y autonomía acotada.
+
+DeepSeek Harness ya tiene herramientas potentes. Este bundle añade la disciplina
+para usarlas bien: mantiene la evidencia de revisión derivada de Git en lugar de
+la narración del agente, y deja las decisiones de entrega en la política ordinary
+del repositorio.
 
 Es el paquete hermano de [`gentle-pi`](https://github.com/Gentleman-Programming/gentle-pi)
 dentro del [ecosistema Gentle-AI](https://github.com/Gentleman-Programming/gentle-ai):
@@ -41,21 +47,24 @@ Ninguna de estas fallas se arregla con un mejor modelo. Se arreglan con
 **proceso observable**: clasificar antes de actuar, verificar con independencia
 y publicar evidencia en lugar de relato.
 
+Dreamcoder DSH arregla el proceso alrededor del agente.
+
 ## Qué añade
 
 | Capa | Mecanismo | Qué aporta |
 |---|---|---|
-| Identidad | fila `system-prompt` del bundle | Persona operativa con pipeline de 10 etapas y reglas de evidencia |
-| Riesgo | skill `workflow-router` | Clasificación P0–P3 y elección del workflow mínimo seguro (`direct`, `mini-sdd`, `full-sdd`) |
-| Delegación | 6 agent presets | `explorer`, `architect`, `implementer`, `tester`, `reviewer`, `security` — roles con permisos acotados |
-| TDD | skill `tdd-evidence` + `scripts/red-green.ts` | Ciclo RED→GREEN capturado en `<repo>/.evidence/`; sin salida real no hay TDD |
-| Revisión | skill `review-4r` | Lentes Readability/Reliability/Resilience/Risk con contexto fresco |
-| Cierre | skill `evidence-ledger` + `scripts/evidence-ledger.ts` | Receipt YAML derivado de Git (SHAs, scope, checks) con SHA256 |
-| Memoria | skill `memory-gate` + overlay Engram opcional | Gate que decide qué merece memoria longitudinal; solo el orquestador lee/escribe memoria |
-| Modelos | skill `model-router` | Decisión explícita `rol → riesgo → modelo → esfuerzo`; nada de defaults silenciosos |
-| Contexto | política §7 | Presupuestos por franja y compactación antes de que degrade la calidad |
-| Autonomía | política §9 + skill `autonomous-mission` | Goals persistidos + jobs con límite de rounds fijado antes de empezar |
-| Salud | `scripts/dream-doctor.sh` | Diagnóstico de instalación: binarios, perfil, política, presets, skills, memoria |
+| **Identidad operativa** | fila `system-prompt` del bundle | Persona de ingeniería con pipeline de 10 etapas, reglas de evidencia y jerarquía de permisos P0–P5 |
+| **Routing de trabajo** | skill `workflow-router` | Clasificación P0–P3 antes de tocar código y elección del workflow mínimo seguro (`direct`, `mini-sdd`, `full-sdd`) |
+| **Delegación disciplinada** | 6 agent presets | `explorer`, `architect`, `implementer`, `tester`, `reviewer`, `security` — roles con permisos acotados y separación estructural implementar/verificar |
+| **TDD con evidencia** | skill `tdd-evidence` + `scripts/red-green.ts` | Ciclo RED→GREEN→TRIANGULATE→REFACTOR capturado en `<repo>/.evidence/`; sin salida real no hay TDD |
+| **Revisión 4R** | skill `review-4r` | Lentes Readability/Reliability/Resilience/Risk con contexto fresco; jamás aprueba por cortesía |
+| **Receipts de cierre** | skill `evidence-ledger` + `scripts/evidence-ledger.ts` | Recibo YAML derivado de Git (SHAs, scope, checks) cerrado con SHA256; sin recibo no hay misión completa |
+| **Memoria longitudinal** | skill `memory-gate` + overlay Engram opcional | Gate que decide qué merece persistirse; solo el orquestador lee/escribe memoria |
+| **Routing de modelos** | skill `model-router` | Decisión explícita `rol → riesgo → modelo → esfuerzo`; nada de defaults silenciosos; providers externos codex/claude-code |
+| **Presupuesto de contexto** | política §7 + `scripts/context-governor.ts` | Franjas de presupuesto por misión y compactación antes de que degrade la calidad |
+| **Autonomía acotada** | política §9 + skill `autonomous-mission` | Goals persistidos + jobs en segundo plano con límite de rounds fijado antes de empezar |
+| **Seguridad mecánica** | `scripts/security-gate.ts` + hooks | Deny-list P5, rutas sensibles bloqueadas, hook pre-commit anti-secretos y bypass auditable fail-closed |
+| **Salud y observabilidad** | `scripts/dream-doctor.sh` + `scripts/dream-metrics.ts` | Diagnóstico de instalación en 13 chequeos y métricas derivadas de Git |
 
 ## Arquitectura
 
@@ -76,7 +85,7 @@ sobre el árbol compuesto `base + web-app`. Dos decisiones de diseño:
 1. **Overrides con reemplazo completo.** Cada override restituye toda la
    configuración que quiere conservar (no hay deep-merge); esto hace el patch
    determinista y auditable en una sola lectura.
-2. **Portabilidad sin rutas absolutas.** El bundle ya no registra
+2. **Portabilidad sin rutas absolutas.** El bundle no registra
    `customSkillDirs`: `scripts/install.sh` enlaza cada skill en la raíz de
    usuario por defecto de dsh-skill-filesystem (`$DSH_HOME/skills`), así el
    patch no contiene rutas dependientes de la máquina.
@@ -94,14 +103,17 @@ Detalle completo en [`docs/architecture.md`](docs/architecture.md).
 | `policy/AGENTS.md` | Contrato operativo global → se instala en `~/.dsh/AGENTS.md` (con backup) |
 | `profiles/engineering/` | Manifiesto del perfil: `base` + `web-app` + este bundle |
 | `memory/engram.cordis.yml` | Overlay opcional de memoria longitudinal (Engram vía MCP) |
-| `scripts/` | Instalador, doctor, red-green, evidence-ledger, verify-compat, verify-presets |
+| `contracts/` | Contratos machine-readable de las etapas SDD, verificados contra los workflows |
+| `bench/` | Corpus de journeys para el mini-bench en modo driven |
+| `scripts/` | Instalador, doctor, gates, red-green, evidence-ledger y verificadores |
+| `hooks/` | Plantilla de hooks Claude Code para el puente opcional |
 | `docs/` | Referencia de arquitectura, skills y troubleshooting |
 
 ## Instalación
 
 Requisitos:
 
-- `dsh` + `pnpm` (instalación base de DeepSeek Harness)
+- instalación base de DeepSeek Harness (`dsh`)
 - [pnpm](https://pnpm.io) 11.22.0 como gestor de paquetes único
 - Node ≥ 26 para el tooling TypeScript nativo
 - Opcional: binario `engram` v1.20.0 en PATH si vas a habilitar memoria
@@ -112,6 +124,7 @@ pnpm install                            # dependencias de desarrollo (tsgo, @typ
 
 bash scripts/install.sh                 # instala perfil, política y presets (idempotente)
 bash scripts/install.sh --with-engram   # además habilita memoria Engram (requiere binario)
+bash scripts/install.sh --with-hooks    # además hook pre-commit anti-secretos + pre-push
 ```
 
 Qué hace el instalador:
@@ -126,19 +139,27 @@ Qué hace el instalador:
 `DSH_HOME` respeta su valor de entorno (default: `~/.dsh`); la instalación es
 idempotente y puede re-ejecutarse sin efectos residuales.
 
+Paquetes recomendados del ecosistema:
+
+```bash
+# El hermano Pi-native, si también usas Pi:
+# https://github.com/Gentleman-Programming/gentle-pi
+```
+
 ## Inicio rápido
 
 ```bash
-bash scripts/dream-doctor.sh   # salud de la instalación (7 chequeos)
+bash scripts/dream-doctor.sh   # salud de la instalación (13 chequeos)
 dsh --profile engineering      # arranca la sesión disciplinada
 ```
 
-Dentro de la sesión:
+Flujo típico:
 
-- los presets aparecen en el selector de agentes;
-- la skill `workflow-router` clasifica cada tarea entrante (P0–P3) y elige el
-  workflow mínimo seguro — el proceso es proporcional al riesgo, no ritual;
-- cada misión P≥1 cierra con un receipt (`evidence-ledger`) bajo `.evidence/`.
+1. Ejecuta `dream-doctor.sh` y confirma que los 13 chequeos pasan.
+2. Arranca `dsh --profile engineering`. Los presets aparecen en el selector de agentes.
+3. Pide cualquier tarea: la skill `workflow-router` la clasifica (P0–P3) y elige
+   el workflow mínimo seguro — el proceso es proporcional al riesgo, no ritual.
+4. Cada misión P≥1 cierra con un receipt (`evidence-ledger`) bajo `.evidence/`.
 
 Verificación del tooling sin instalar nada:
 
@@ -151,7 +172,7 @@ Todo el tooling del bundle es TypeScript estricto ejecutado con Node —TS nativ
 sin build step— tipado con la línea 7.x del compilador nativo
 (`@typescript/native-preview`, `tsgo`).
 
-## Workflow núcleo
+## Cómo decide el harness qué hacer
 
 Toda tarea recorre el mismo pipeline de diez etapas: **Architect → Clarify →
 Classify risk → Select workflow → Retrieve context → Delegate → Implement →
@@ -159,7 +180,8 @@ Verify independently → Review → Publish evidence**. Ninguna etapa se omite e
 silencio: si no aporta (p. ej. Clarify en un typo), se declara omitida en una
 línea del reporte.
 
-La clasificación de riesgo decide cuánto proceso aplica:
+El objetivo no es ceremonia: es evitar el caos accidental. La clasificación de
+riesgo decide cuánto proceso aplica:
 
 | Nivel | Definición | Ejemplo | Workflow |
 |---|---|---|---|
@@ -170,6 +192,40 @@ La clasificación de riesgo decide cuánto proceso aplica:
 
 Regla de oro ante duda entre dos niveles: gana el más alto. Y si la tarea real
 excede su nivel declarado, se reclasifica antes de continuar.
+
+```mermaid
+flowchart TD
+    A["Clarify scope and acceptance criteria"] --> B{"Classify risk"}
+    B -->|"P0–P1"| C["Workflow direct"]
+    B -->|P2| D["Workflow mini-sdd"]
+    B -->|P3| E["Workflow full-sdd"]
+    C --> F["Implementación con evidencia de test"]
+    D --> F
+    E --> F
+    F --> G["Verificación independiente\n(quien implementa no se autoaprueba)"]
+    G --> H["Review con lentes 4R\ny contexto fresco"]
+    H --> I["Publish evidence:\nreceipt YAML derivado de Git"]
+```
+
+### Disparadores de delegación
+
+El orquestador mantiene su sesión delgada y delega en el punto más estrecho
+útil:
+
+| Disparador | Comportamiento requerido |
+|---|---|
+| Leer 4+ archivos para entender un flujo | Lanzar `explorer`: exploración de solo lectura con hallazgos citados |
+| Tocar 2+ archivos de código no triviales | Delegar a un único `implementer`; no continuar inline salvo indisponibilidad |
+| Misión larga (~20 tool calls, 5 lecturas exploratorias o 2 edits no mecánicos) | Pausar y delegar el resto, o detenerse explicando el bloqueo exacto |
+| Presión de contexto (`context:warning` / `context:critical`) | Cerrar la unidad en curso y compactar antes de seguir |
+| Operación P4/P5 o decisión no contemplada | Escalar a humano; nunca envolverla en un script mayor |
+
+El loop equilibrado para un bugfix acotado:
+
+```text
+parent clarifica y clasifica → un worker escribe el fix autorizado →
+verificación enfocada (tester) → review 4R → parent publica receipt
+```
 
 ## Skills incluidas
 
@@ -210,17 +266,41 @@ implementa / verifica es estructural, no disciplinaria:
 | `/dream-doctor` · `/dream-status` | Comandos in-session de la GUI (tras reiniciar dsh): corren doctor y métricas sin salir de la sesión |
 | `bash scripts/dream-doctor.sh` | Salud de la instalación en 13 chequeos (seguridad, vanguardia y procedencia SHA-256) |
 | `pnpm verify` | Compatibilidad contra DSH pineado + validación de presets + contratos |
-| `pnpm bench` | Mini-bench MODO DRIVEN: ejecuta los journeys de `bench/` y deja recibo en `.evidence/bench-latest.json` |
+| `pnpm bench` | Mini-bench MODO DRIVEN: ejecuta los journeys de `bench/` y deja recibo en `.evidence/bench-latest.json` · `--list` muestra el corpus sin ejecutar · `--json` emite un objeto JSON machine-readable por stdout (CI/tooling) · `--only j1,j2` subset |
 | `pnpm typecheck` | `tsgo --noEmit` sobre todo el tooling |
 | `node scripts/red-green.ts` | Ciclo TDD completo RED→GREEN→TRIANGULATE→REFACTOR con evidencia |
 | `node scripts/evidence-ledger.ts` | Receipt de misión derivado de Git; `--sdd <misión>` exige el gate SDD |
 | `node scripts/security-gate.ts` | Gate P0–P5: bloquea P5 y rutas sensibles; bypass auditable |
 | `node scripts/sdd-gate.ts` | Orden de etapas SDD exigido en runtime (contratos machine-readable) |
 | `node scripts/sdd-specs.ts` | Specs canónicas SDD: `new`/`sync`/`archive` alineadas al contrato; SHA-256 en el índice de archivo |
+| `node scripts/context-governor.ts` | Lee el uso real de sesión y emite `context:ok\|warning\|critical` como gate componible |
 | `node scripts/skill-router.ts` | Presupuesto de skills: top-3 por relevancia, resto diferido |
 | `node scripts/update-guard.ts` | Vanguardia: pin local vs última release upstream (cache offline) |
 
+## Seguridad con dientes
+
+Las reglas de permisos (§3–§4 de la política) tienen enforcement mecánico, no
+solo texto:
+
+- **security-gate** clasifica cada comando contra la jerarquía P0–P5 y bloquea
+  los patrones destructivos canónicos (`rm -rf`, `git reset --hard`,
+  `push --force`, drops de base de datos…) y las rutas sensibles
+  (`~/.ssh/`, `.env`, claves privadas).
+- **Hook pre-commit** (`install.sh --with-hooks`) impide commitear rutas
+  sensibles y claves privadas en el diff staged.
+- **Bypass auditable**: el único escape es `DC_SECURITY_BYPASS="quién aprobó y
+  cuándo"`, registrado en `.evidence/security-gate-audit.jsonl`; si la traza no
+  puede escribirse, el bypass se deniega (fail-closed).
+- **sdd-gate**: saltarse una etapa del workflow elegido falla mecánicamente
+  (`advance` valida orden contra `contracts/*.json`); `evidence-ledger --sdd`
+  niega el receipt a misiones incompletas.
+
+No sustituye el criterio humano: cubre la superficie determinable.
+
 ## Evidencia y receipts
+
+> **Confía en lo que el sistema puede derivar, no en lo que el agente afirma.**
+> Los agentes analizan el cambio. El recibo lo deriva Git.
 
 La regla central: **ninguna afirmación de "hecho", "funciona" o "roto" sin
 evidencia observable** — salida de test, `git diff`, exit code. "Debería
@@ -299,16 +379,19 @@ pnpm install && pnpm typecheck && pnpm test && pnpm verify
 ```
 
 La integración continua ([`.github/workflows/ci.yml`](.github/workflows/ci.yml))
-ejecuta dos jobs: `tooling` (gate duro: typecheck + integridad de enlaces y
-rutas de la documentación) y `composition` (best-effort: requiere una
-instalación local de `dsh`; el gate autoritativo sigue siendo tu máquina con
-`pnpm verify` + `dream-doctor.sh`).
+ejecuta dos jobs: `tooling` (gate duro: typecheck + mini-bench host-free +
+vanguardia offline + integridad de enlaces y rutas de la documentación) y
+`composition` (best-effort: requiere una instalación local de `dsh`; el gate
+autoritativo sigue siendo tu máquina con `pnpm verify` + `dream-doctor.sh`).
 
 Para contribuir, lee [CONTRIBUTING.md](CONTRIBUTING.md). El historial de
 cambios vive en [CHANGELOG.md](CHANGELOG.md). Para proponer cambios upstream al
 ecosistema Gentle-AI (issue-first):
 [`docs/contribution-gentle-ai.md`](docs/contribution-gentle-ai.md) ·
 [versión en inglés](docs/contribution-gentle-ai.en.md).
+
+Si un problema te bloquea, [`docs/troubleshooting.md`](docs/troubleshooting.md)
+reúne los fallos conocidos y sus salidas exactas.
 
 ## Licencia
 

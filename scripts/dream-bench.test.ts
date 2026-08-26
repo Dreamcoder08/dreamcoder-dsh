@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 import { journeys, type Journey } from '../bench/corpus.ts'
-import { evaluateStep, runJourney, validateCorpus } from './dream-bench.ts'
+import { evaluateStep, formatList, parseArgs, runJourney, validateCorpus } from './dream-bench.ts'
 
 describe('corpus declarations', () => {
   test('the real corpus is valid: unique j<N> ids, closed axes, runnable steps, declared why', () => {
@@ -44,6 +44,51 @@ describe('corpus declarations', () => {
     assert.ok(errors.some((e) => e.includes('formato')))
     assert.ok(errors.some((e) => e.includes('comando ejecutable')))
     assert.ok(errors.some((e) => e.includes('why') || e.includes('POR QUÉ')))
+  })
+})
+
+describe('cli surface (parseArgs / formatList)', () => {
+  test('sin argumentos: corpus completo, sin list ni json', () => {
+    const r = parseArgs([])
+    assert.equal(r.ok, true)
+    if (r.ok) {
+      assert.equal(r.args.only, null)
+      assert.equal(r.args.list, false)
+      assert.equal(r.args.json, false)
+    }
+  })
+
+  test('--only parsea ids y rechaza lista vacía con exit 4', () => {
+    const ok = parseArgs(['--only', 'j1, j2 ,'])
+    assert.equal(ok.ok, true)
+    if (ok.ok) assert.deepEqual([...(ok.args.only ?? [])], ['j1', 'j2'])
+    const bad = parseArgs(['--only', '  '])
+    assert.equal(bad.ok, false)
+    if (!bad.ok) assert.equal(bad.code, 4)
+  })
+
+  test('argumento desconocido → exit 4; flags nuevos se aceptan', () => {
+    const unk = parseArgs(['--help'])
+    assert.equal(unk.ok, false)
+    if (!unk.ok) assert.equal(unk.code, 4)
+    const flags = parseArgs(['--list', '--json'])
+    assert.equal(flags.ok, true)
+    if (flags.ok) {
+      assert.equal(flags.args.list, true)
+      assert.equal(flags.args.json, true)
+    }
+  })
+
+  test('formatList cubre el corpus real: id, eje, título y conteo de steps', () => {
+    const out = formatList(journeys)
+    const lines = out.split('\n')
+    assert.equal(lines.length, journeys.length)
+    for (const j of journeys) {
+      const line = lines.find((l) => l.startsWith(`${j.id}  `))
+      assert.ok(line, `falta ${j.id} en el listado`)
+      assert.match(line, new RegExp(`\\[${j.axis}\\]`))
+      assert.match(line, /\(\d+ step\(s\)\)$/)
+    }
   })
 })
 
