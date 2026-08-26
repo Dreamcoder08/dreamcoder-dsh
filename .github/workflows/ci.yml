@@ -92,13 +92,14 @@ jobs:
 
   # La verificación de composición (pnpm verify) necesita un `dsh` real y
   # el perfil instalado en DSH_HOME; no es reproducible en el runner estándar.
-  # Se ejecuta best-effort para detectar rupturas obvias sin bloquear el gate
-  # principal. El gate autoritativo sigue siendo la máquina con instalación
-  # local: pnpm verify && bash scripts/dream-doctor.sh.
+  # Sin dsh el job se omite con notice; con dsh es estricto. El gate
+  # autoritativo sigue siendo la máquina con instalación local:
+  # pnpm verify && bash scripts/dream-doctor.sh.
+  # `continue-on-error` eliminado: con el guard de dsh en el workflow, este job
+  # ahora es determinista (verde limpio sin dsh, estricto con dsh).
   composition:
-    name: Composition (best-effort, requires dsh)
+    name: Composition (skips without dsh)
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -115,5 +116,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # La verificación de composición necesita un `dsh` real y el perfil
+      # instalado en DSH_HOME; no es reproducible en el runner estándar. Si el
+      # binario no existe se OMITE con notice (exit 0) — nunca una ❌ permanente
+      # en Actions. El gate autoritativo es la máquina local: pnpm verify.
       - name: Verify composition
-        run: pnpm verify
+        run: |
+          if ! command -v dsh >/dev/null 2>&1; then
+            echo "::notice::dsh no disponible en este runner — verificación de composición omitida. Gate autoritativo local: pnpm verify && bash scripts/dream-doctor.sh"
+            exit 0
+          fi
+          pnpm verify

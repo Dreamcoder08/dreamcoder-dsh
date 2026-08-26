@@ -45,7 +45,12 @@ const dump = spawnSync('dsh', ['--profile', profile, '--dump-config'], {
   maxBuffer: 64 * 1024 * 1024,
 })
 if (dump.status !== 0) {
-  console.error('ERROR: la composición del perfil falló:\n' + dump.stderr)
+  const errCode = (dump.error as NodeJS.ErrnoException | undefined)?.code
+  const reason =
+    errCode === 'ENOENT'
+      ? 'el binario `dsh` no está en PATH (instalación local requerida; en CI este job se omite)'
+      : (dump.stderr ?? String(dump.error ?? 'sin stderr'))
+  console.error('ERROR: la composición del perfil falló:\n' + reason)
   process.exit(1)
 }
 const config = dump.stdout ?? ''
