@@ -61,6 +61,47 @@ test('command: bypass auditable permite y registra', () => {
   strictEqual(/BYPASS auditado/.test(r.stderr), true, r.stderr)
 })
 
+// ── Regresiones de la revisión fresh-context (FN/FP reproducidos) ────────────
+
+const p5RegressionCases: readonly [string, string[]][] = [
+  ['git -C dir reset --hard (flag global)', ['git', '-C', 'subdir', 'reset', '--hard']],
+  ['terraform -chdir=dir destroy', ['terraform', '-chdir=prod', 'destroy']],
+  ['kubectl delete ns (abreviatura)', ['kubectl', 'delete', 'ns', 'prod']],
+  ['kubectl delete namespace (plural)', ['kubectl', 'delete', 'namespace', 'prod']],
+  ['git push refspec +main', ['git', 'push', 'origin', '+main']],
+]
+
+for (const [why, cmd] of p5RegressionCases) {
+  test(`command: bloquea ${why} (regresión FN)`, () => {
+    const r = run(['command', '--', ...cmd])
+    strictEqual(r.status, 1, `${why} debió bloquearse; salida: ${r.stdout}${r.stderr}`)
+  })
+}
+
+const fpCases: readonly [string, string[]][] = [
+  ['cp --recursive no es P5', ['cp', '--recursive', 'a', 'b']],
+  ['grep --recursive no es P5', ['grep', '--recursive', 'x', '.']],
+  ['filter credentials-api no es ruta sensible', ['pnpm', 'test', '--filter', 'credentials-api']],
+  ['rama fix-token-logic no es ruta sensible', ['git', 'push', 'origin', 'fix-token-logic']],
+]
+
+for (const [why, cmd] of fpCases) {
+  test(`classify: NO bloquea (${why})`, () => {
+    const r = run(['command', '--', ...cmd])
+    strictEqual(r.status, 0, `${why} fue FP: ${r.stdout}${r.stderr}`)
+  })
+}
+
+test('classify: .env.production.local es sensible (doble sufijo)', () => {
+  const r = run(['command', '--', 'cat', '.env.production.local'])
+  strictEqual(r.status, 1)
+})
+
+test('classify: patrones insensibles a mayúsculas (.PEM)', () => {
+  const r = run(['command', '--', 'cat', 'certs/SERVER.PEM'])
+  strictEqual(r.status, 1)
+})
+
 test('uso inválido → exit 2', () => {
   const r = run([])
   strictEqual(r.status, 2)

@@ -23,35 +23,86 @@ import { appendFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 
 // ── Patrones P5 (policy/AGENTS.md §3): irreversible o alto radio ─────────────
+// El matching se hace sobre una línea NORMALIZADA (flags globales como
+// `git -C dir` o `terraform -chdir=d` se separan antes) para cerrar las
+// formas canónicas que la adyacencia simple dejaría pasar.
 export const DESTRUCTIVE_PATTERNS: readonly { re: RegExp; why: string }[] = [
-  { re: /\brm\s+(-[a-zA-Z]*[rf][a-zA-Z]*\s+)+|--recursive/, why: 'rm recursivo/forzado' },
+  { re: /\brm\s+(?:-{1,2}[\w-]+\s+)*-\w*[rR]\w*\s|\brm\s+(?:-{1,2}[\w-]+\s+)*-\w*f\w*\s/, why: 'rm recursivo/forzado' },
   { re: /\bgit\s+reset\s+--hard\b/, why: 'git reset --hard' },
-  { re: /\bgit\s+clean\b.*-[a-zA-Z]*[fdx]/, why: 'git clean -fdx' },
-  { re: /\bgit\s+push\s+(--force|-f)\b/, why: 'git push --force' },
+  { re: /\bgit\s+clean\b[^|;&]*-[a-zA-Z]*[fdx]/, why: 'git clean -fdx' },
+  { re: /\bgit\s+push\b[^|;&]*(--force\b|--force-with-lease\b|-f\b|\s\+[\w./-]+)/, why: 'git push forzado (flag o refspec +ref)' },
   { re: /\bdrop\s+(database|table)\b/i, why: 'DROP DATABASE/TABLE' },
-  { re: /\btruncate\s+table\b.*\bcascade\b/i, why: 'TRUNCATE … CASCADE masivo' },
+  { re: /\btruncate\s+table\b/i, why: 'TRUNCATE TABLE (alto radio: requiere bypass auditable)' },
   { re: /\bterraform\s+destroy\b/, why: 'terraform destroy' },
-  { re: /\bkubectl\s+delete\b.*\b(pvc|persistentvolumeclaim|namespace|crd|customresourcedefinition)\b/i, why: 'kubectl delete sobre recursos con estado' },
+  { re: /\bkubectl\s+delete\b/i, why: 'kubectl delete (verificar recurso con estado)' },
   { re: /\bmkfs(\.\w+)?\b/, why: 'mkfs' },
   { re: /\bdd\b[^\n]*of=\/dev\//, why: 'dd hacia dispositivo de bloques' },
 ]
 
 // ── Rutas sensibles denegadas por defecto (policy/AGENTS.md §4) ──────────────
+// Se evalúan SOLO sobre argumentos con forma de ruta (contienen separador o
+// empiezan con punto), para no criminalizar palabras sueltas en flags.
 export const SENSITIVE_PATH_PATTERNS: readonly RegExp[] = [
-  /(^|[\\/])\.ssh([\\/]|$)/,
-  /(^|[\\/])\.aws([\\/]|$)/,
-  /(^|[\\/])\.gnupg([\\/]|$)/,
-  /(^|[\\/])\.env($|\.[^.]*$)/,
-  /\.pem$/,
-  /\.key$/,
-  /\.p12$/,
-  /(^|[\\/])id_rsa/,
-  /(credential|credentials)/i,
-  /(secret|secrets)([\\/.$_-]|$)/i,
-  /(token|tokens)([\\/.$_-]|$)/i,
+  /(^|[\\/])\.ssh([\\/]|$)/i,
+  /(^|[\\/])\.aws([\\/]|$)/i,
+  /(^|[\\/])\.gnupg([\\/]|$)/i,
+  /(^|[\\/])\.env(\.[^/]*)?$/i,
+  /\.pem$/i,
+  /\.key$/i,
+  /\.p12$/i,
+  /(^|[\\/])id_(rsa|ed25519|ecdsa)/i,
+  /credential/i,
+  /secret/i,
+  /token/i,
 ]
 
 const PRIVATE_KEY_MARKER = /-----BEGIN [A-Z ]*PRIVATE KEY-----/
+
+/** Un argumento "parece ruta" si lleva separador o comienza con punto. */
+function looksLikePath(arg: string): boolean {
+  return arg.includes('/') || arg.includes('\\') || arg.startsWith('.')
+}
+
+/**
+ * Normaliza la línea de comando para el matching destructivo: separa los
+ * valores de flags globales conocidos (`git -C dir …`, `terraform
+ * -chdir=dir …`, `kubectl -n ns …`) para que la adyacencia del patrón no
+ * dependa de ellos.
+ */
+export function normalizeCommand(argv: readonly string[]): string {
+  // binario → flags que consumen valor y son ajenos a la operación.
+  const GLOBAL_FLAGS: Record<string, RegExp> = {
+    git: /^(-C|--git-dir|--work-tree)$/,
+    terraform: /^(-chdir)$/,
+    kubectl: /^(-n|--namespace|--context|--kubeconfig)$/,
+    psql: /^(-h|-p|-U|-d)$/,
+  }
+  // Flags con valor PEGADO (`-chdir=prod`): se omiten enteras.
+  const GLOBAL_FLAGS_ATTACHED: Record<string, RegExp> = {
+    git: /^--git-dir=|^--work-tree=/,
+    terraform: /^-chdir=/,
+    kubectl: /^--namespace=|^--context=|^--kubeconfig=/,
+  }
+  const out: string[] = []
+  let skipValue = false
+  for (const rawArg of argv) {
+    const a = rawArg ?? ''
+    if (skipValue) {
+      skipValue = false
+      continue
+    }
+    const headRe = out.length > 0 ? (GLOBAL_FLAGS[out[0] as string] ?? null) : null
+    const attachedRe = out.length > 0 ? (GLOBAL_FLAGS_ATTACHED[out[0] as string] ?? null) : null
+    if (a.startsWith('-') && headRe !== null && headRe.test(a)) {
+      // Flag y su valor se omiten de la línea normalizada.
+      skipValue = true
+      continue
+    }
+    if (a.startsWith('-') && attachedRe !== null && attachedRe.test(a)) continue
+    out.push(a)
+  }
+  return out.join(' ')
+}
 
 export interface Classification {
   level: 'P0' | 'P1' | 'P2' | 'P3' | 'P4' | 'P5' | 'UNKNOWN'
@@ -60,7 +111,7 @@ export interface Classification {
 }
 
 export function classifyCommand(argv: readonly string[]): Classification {
-  const line = argv.join(' ')
+  const line = normalizeCommand(argv)
   const reasons: string[] = []
   const ORDER = ['UNKNOWN', 'P0', 'P1', 'P2', 'P3', 'P4', 'P5'] as const
   let rank = 0
@@ -74,8 +125,11 @@ export function classifyCommand(argv: readonly string[]): Classification {
     if (why !== undefined) reasons.push(why)
   }
 
-  for (const p of SENSITIVE_PATH_PATTERNS) {
-    if (argv.some((a) => p.test(a))) bump('P5', `ruta sensible: patrón ${p.source}`)
+  for (const a of argv) {
+    if (!looksLikePath(a)) continue
+    for (const p of SENSITIVE_PATH_PATTERNS) {
+      if (p.test(a)) bump('P5', `ruta sensible: patrón ${p.source}`)
+    }
   }
   for (const d of DESTRUCTIVE_PATTERNS) {
     if (d.re.test(line)) bump('P5', d.why)
@@ -107,7 +161,8 @@ function stagedAddedLines(): string[] {
     .filter((l) => l.startsWith('+') && !l.startsWith('+++'))
 }
 
-function audit(event: string, detail: Record<string, string>): void {
+/** Escribe el audit log; devuelve false si NO pudo registrarse (fail-closed). */
+function audit(event: string, detail: Record<string, string>): boolean {
   try {
     const dir = join(process.cwd(), '.evidence')
     mkdirSync(dir, { recursive: true })
@@ -115,8 +170,11 @@ function audit(event: string, detail: Record<string, string>): void {
       join(dir, 'security-gate-audit.jsonl'),
       JSON.stringify({ event, at: new Date().toISOString(), user: process.env.USER ?? 'unknown', ...detail }) + '\n',
     )
+    return true
   } catch {
-    // El audit log es best-effort: jamás bloquea por fallas propias.
+    // El invariante "el único escape es auditable" es fail-closed: si la
+    // traza no puede escribirse, el bypass no se otorga.
+    return false
   }
 }
 
@@ -153,7 +211,13 @@ if ((mode === 'classify' || mode === 'command') && sep !== -1 && sep + 1 < argv.
   const bypass = process.env.DC_SECURITY_BYPASS
   if (!c.blocked) process.exit(0)
   if (bypass !== undefined && bypass.trim() !== '') {
-    audit('bypass', { command: cmd.join(' '), reason: bypass.trim(), level: c.level })
+    if (!audit('bypass', { command: cmd.join(' '), reason: bypass.trim(), level: c.level })) {
+      console.error(
+        '✘ BYPASS DENEGADO: no se pudo escribir la traza de auditoría en .evidence/.' +
+          ' El escape exige registro; libera permisos de escritura y reintenta.',
+      )
+      process.exit(1)
+    }
     console.error(`⚠ BYPASS auditado (${bypass.trim()}) — registrado en .evidence/security-gate-audit.jsonl`)
     process.exit(0)
   }

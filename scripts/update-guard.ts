@@ -45,24 +45,44 @@ const fetchUpstream = async (): Promise<string | null> => {
   try {
     // El repo no publica "releases/latest": el canal de versiones son los
     // tags con prefijo dsh-v…; pedimos el primero (más reciente).
-    const res = await fetch(REPO_TAGS, { headers: { 'User-Agent': 'dreamcoder-update-guard' } })
+    const res = await fetch(REPO_TAGS, {
+      headers: { 'User-Agent': 'dreamcoder-update-guard' },
+      signal: AbortSignal.timeout(10_000),
+    })
     if (!res.ok) return null
     const body = (await res.json()) as { name?: string }[]
     const tag = body[0]?.name ?? ''
     const m = tag.match(/v?(\d[\w.\-+]*)$/)
-    return m !== null ? (m[1] ?? null) : null
+    return m !== null && m[1] !== undefined ? m[1] : null
   } catch {
     return null
   }
 }
 
-const compare = (local: string, upstream: string): number => {
-  const seg = (v: string): number[] => v.split(/[.\-+]/).map((x) => Number.parseInt(x, 10) || 0)
-  const a = seg(local)
-  const b = seg(upstream)
-  for (let i = 0; i < Math.max(a.length, b.length); i++) {
-    const diff = (b[i] ?? 0) - (a[i] ?? 0)
-    if (diff !== 0) return diff > 0 ? -1 : 1 // -1: upstream mayor → desactualizado
+/**
+ * Comparación estilo semver con manejo de prerelease: un prerelease
+ * (`-rc.2`) es MENOR que la release final del mismo núcleo, así que
+ * `0.1.1-rc.2` vs `0.1.1` se reporta como desactualizado y no al revés.
+ * Devuelve > 0 si `local` es mayor, < 0 si lo es `upstream`, 0 si iguales.
+ */
+export function compareVersions(local: string, upstream: string): number {
+  const parse = (v: string): { core: number[]; pre: string | null } => {
+    const [corePart, ...rest] = v.split('-')
+    const core = (corePart ?? '').split(/[.+]/).map((x) => Number.parseInt(x, 10) || 0)
+    return { core, pre: rest.length > 0 ? rest.join('-') : null }
+  }
+  const a = parse(local)
+  const b = parse(upstream)
+  for (let i = 0; i < Math.max(a.core.length, b.core.length); i++) {
+    const diff = (b.core[i] ?? 0) - (a.core[i] ?? 0)
+    if (diff !== 0) return diff > 0 ? -1 : 1
+  }
+  // Mismo núcleo: sin prerelease gana sobre con prerelease.
+  if (a.pre === null && b.pre !== null) return 1
+  if (a.pre !== null && b.pre === null) return -1
+  if (a.pre !== null && b.pre !== null) {
+    const cmp = a.pre.localeCompare(b.pre)
+    if (cmp !== 0) return -cmp
   }
   return 0
 }
@@ -87,8 +107,13 @@ if (!offline) {
 if (upstream === null) {
   if (existsSync(CACHE)) {
     try {
-      upstream = (JSON.parse(readFileSync(CACHE, 'utf8')) as CacheShape).latest ?? null
-      source = `cache ${CACHE} (${(JSON.parse(readFileSync(CACHE, 'utf8')) as CacheShape).fetchedAt})`
+      const cache = JSON.parse(readFileSync(CACHE, 'utf8')) as Partial<CacheShape>
+      // Cache validada por forma: un valor corrupto se ignora, nunca se usa
+      // como verdad comparativa.
+      if (typeof cache.latest === 'string' && /^\d[\w.\-+]*$/.test(cache.latest)) {
+        upstream = cache.latest
+        source = `cache ${CACHE} (${String(cache.fetchedAt)})`
+      }
     } catch {
       /* cache corrupta: se ignora */
     }
@@ -101,7 +126,7 @@ if (upstream === null || local === null) {
 }
 console.log(`última upstream: ${upstream} (fuente: ${source})`)
 
-const cmp = compare(local, upstream)
+const cmp = compareVersions(local ?? '', upstream)
 if (cmp === 0) {
   console.log('✔ En la vanguardia: el pin local coincide con la última release.')
   process.exit(0)

@@ -102,6 +102,13 @@ try {
     }
     if (/[/\\]|\.\./.test(mission)) throw new Error('Nombre de misión inválido')
     const contract = loadContract(workflow)
+    if (existsSync(statePath(mission)) && args.force !== true) {
+      console.error(
+        `✘ La misión '${mission}' ya tiene estado SDD. Re-iniciar borraría el progreso ` +
+          `(y con él un futuro receipt --sdd). Usa --force solo si de verdad quieres empezar de cero.`,
+      )
+      process.exit(1)
+    }
     const state: MissionState = {
       mission,
       workflow,
@@ -170,6 +177,12 @@ try {
   console.error(USAGE)
   process.exit(2)
 } catch (err) {
-  console.error(`✘ ${err instanceof Error ? err.message : String(err)}`)
+  // Uso inválido (argumentos) → 2; gate violado o estado problemático → 1.
+  const msg = err instanceof Error ? err.message : String(err)
+  if (/Argumento desconocido/.test(msg)) {
+    console.error(`✘ ${msg}`)
+    process.exit(2)
+  }
+  console.error(`✘ ${msg}`)
   process.exit(1)
 }

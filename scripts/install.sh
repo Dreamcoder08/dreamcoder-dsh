@@ -224,6 +224,11 @@ if $WITH_HOOKS; then
 # Generado por scripts/install.sh --with-hooks (policy/AGENTS.md §4).
 exec node \"\$(git rev-parse --show-toplevel)/scripts/security-gate.ts\" stage-check
 "
+  # No pisa un pre-commit ajeno (husky/gitleaks…): hace backup con timestamp.
+  if [ -f "$HOOK" ] && ! grep -q "security-gate" "$HOOK" 2>/dev/null; then
+    cp "$HOOK" "$HOOK.backup.$(date +%Y%m%d-%H%M%S)"
+    echo "==> pre-commit existente respaldado antes de instalar el gate"
+  fi
   printf '%s' "$HOOK_BODY" > "$HOOK" && chmod +x "$HOOK"
   echo "==> hook pre-commit instalado ($HOOK)"
 fi

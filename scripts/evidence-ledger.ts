@@ -202,7 +202,7 @@ const body =
     .join('\n') +
   `\nverdict: ${verdict}\n`
 const sha256 = createHash('sha256').update(body).digest('hex')
-const file = join(dir, `mission-${opts.mission}-${Date.now()}.yaml`)
+const file = join(dir, `mission-${opts.mission}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.yaml`)
 writeFileSync(file, body + `sha256: ${sha256}\n`)
 
 for (const c of checks) console.error(`${c.passed ? '✔' : '✘'} ${c.label}: ${c.command} → exit ${c.exitCode}`)

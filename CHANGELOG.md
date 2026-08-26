@@ -12,16 +12,21 @@ y el versionado respeta [Semantic Versioning](https://semver.org/lang/es/).
 - **Enforcement mecánico de la política (misión "10/10")**:
   - `scripts/security-gate.ts` — la jerarquía P0–P5 (§3–§4) deja de ser prosa:
     clasifica comandos, bloquea P5 (`rm -rf`, `git reset --hard`, `git push
-    --force`, DROP/destroy/delete con estado…) y rutas sensibles (`.env*`,
-    `*.pem`, `~/.ssh`, credenciales), con escape auditable
-    (`DC_SECURITY_BYPASS="quién aprobó"` → `.evidence/security-gate-audit.jsonl`)
-    y modo `stage-check` para pre-commit. Hook instalable vía
-    `install.sh --with-hooks`. 15 tests.
+    --force`/refspec `+ref`, DROP/TRUNCATE/destroy/kubectl delete…) y rutas
+    sensibles (`.env*` con sufijos múltiples, `*.pem`/`*.key`, `~/.ssh`,
+    credenciales), con escape auditable y FAIL-CLOSED
+    (`DC_SECURITY_BYPASS="quién aprobó"` → `.evidence/security-gate-audit.jsonl`;
+    sin traza no hay bypass) y modo `stage-check` para pre-commit. Matching
+    consciente de flags globales (`git -C dir`, `terraform -chdir=dir`,
+    `kubectl -n ns`) y de forma de ruta para evitar falsos positivos. Hook
+    instalable vía `install.sh --with-hooks` (respalda pre-commit ajeno).
+    26 tests.
   - `scripts/sdd-gate.ts` — orden de etapas exigido en runtime contra los
     contratos: saltarse una etapa falla (`advance` valida el siguiente id
-    esperado); estado auditable por misión en `.evidence/sdd-*.json`.
+    esperado); re-iniciar una misión exige `--force` explícito; estado
+    auditable por misión en `.evidence/sdd-*.json`.
     `evidence-ledger --sdd <misión>` niega el receipt si el SDD está
-    incompleto. 5 tests.
+    incompleto. 5 tests (+2 de integración en evidence-ledger).
   - `scripts/skill-router.ts` — presupuesto de skills ejecutable (§10): puntúa
     relevancia tarea↔skill (nombre ×3, descripción/whenToUse ×2, bonus por
     nombre completo) y emite top-N (default 3) + diferidas. Implementado con

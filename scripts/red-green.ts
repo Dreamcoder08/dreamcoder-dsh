@@ -75,6 +75,12 @@ const args: string[] = argv.slice(sep + 2)
 
 const run = (): CommandRun => {
   const r = spawnSync(cmd, args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 })
+  if (r.error !== undefined) {
+    // El comando ni siquiera llegó a ejecutarse (ENOENT, EACCES…):
+    // registrarlo como fase del ciclo sería fabricar evidencia.
+    console.error(`✘ El comando no pudo ejecutarse: ${r.error.message}`)
+    process.exit(1)
+  }
   return {
     command: [cmd, ...args].join(' '),
     exitCode: r.status ?? -1,
@@ -114,18 +120,26 @@ if (phase === 'record-triangulate' || phase === 'record-refactor') {
     console.error(`✘ No hay ciclo RED→GREEN previo (${latestPath}). Cierra un par antes de ${phase}.`)
     process.exit(1)
   }
-  let latest: { file: string }
+  const latestRaw = readFileSync(latestPath, 'utf8')
+  let latest: { file?: string }
   try {
-    latest = JSON.parse(readFileSync(latestPath, 'utf8')) as { file: string }
+    latest = JSON.parse(latestRaw) as { file?: string }
   } catch {
     console.error(`✘ ${latestPath} no es JSON válido.`)
     process.exit(1)
   }
-  if (!existsSync(latest.file)) {
-    console.error(`✘ El ciclo apuntado no existe: ${latest.file}`)
+  if (typeof latest.file !== 'string' || !existsSync(latest.file)) {
+    console.error(`✘ El puntero no señala un ciclo existente (${String(latest.file)}).`)
     process.exit(1)
   }
-  const record = JSON.parse(readFileSync(latest.file, 'utf8')) as CycleRecord
+  const targetFile: string = latest.file
+  let record: CycleRecord
+  try {
+    record = JSON.parse(readFileSync(targetFile, 'utf8')) as CycleRecord
+  } catch {
+    console.error(`✘ El ciclo apuntado no es JSON válido: ${targetFile}`)
+    process.exit(1)
+  }
   if (phase === 'record-triangulate' && record.triangulate !== undefined) {
     console.error('✘ Este ciclo ya tiene TRIANGULATE registrado.')
     process.exit(1)
@@ -144,11 +158,11 @@ if (phase === 'record-triangulate' || phase === 'record-refactor') {
   else record.refactor = runResult
   record.complete =
     record.cycle === 'VALID' && record.triangulate !== undefined && record.refactor !== undefined
-  writeFileSync(latest.file, JSON.stringify(record, null, 2) + '\n')
+  writeFileSync(targetFile, JSON.stringify(record, null, 2) + '\n')
   if (record.complete) {
-    console.log(`✔ Ciclo TDD COMPLETE (RED→GREEN→TRIANGULATE→REFACTOR) — evidencia: ${latest.file}`)
+    console.log(`✔ Ciclo TDD COMPLETE (RED→GREEN→TRIANGULATE→REFACTOR) — evidencia: ${targetFile}`)
   } else {
-    console.log(`✔ ${phase} registrado — evidencia: ${latest.file}`)
+    console.log(`✔ ${phase} registrado — evidencia: ${targetFile}`)
   }
   process.exit(0)
 }
@@ -181,9 +195,12 @@ const record: CycleRecord = {
   capturedAt: new Date().toISOString(),
 }
 const file: string = join(evidenceDir, `red-green-${Date.now()}.json`)
-rmSync(pendingPath)
+// Orden a prueba de muerte: primero el registro definitivo y el puntero,
+// DESPUÉS el consumo del pendiente. Al revés, un corte entre líneas perdería
+// el ciclo o lo atribuiría al anterior.
 writeFileSync(file, JSON.stringify(record, null, 2) + '\n')
 writeFileSync(latestPath, JSON.stringify({ file }, null, 2) + '\n')
+rmSync(pendingPath)
 if (valid) {
   console.log(`✔ Ciclo RED→GREEN VÁLIDO — evidencia: ${file}\n  Continúa con record-triangulate y record-refactor.`)
   process.exit(0)

@@ -73,10 +73,13 @@ Operaciones P5 —requieren aprobación humana explícita, citando el comando ex
 Reglas para P5: pedir aprobación y esperar respuesta humana; nunca envolver una operación P5
 dentro de un script mayor para ocultarla; registrar quién aprobó y cuándo.
 
-Enforcement mecánico (§3–§4): `scripts/security-gate.ts` bloquea estos patrones y rutas
-sensibles, y el hook pre-commit (`install.sh --with-hooks`) impide commitear secretos. El
-único escape es auditable: `DC_SECURITY_BYPASS="quién aprobó y cuándo"` queda registrado en
-`.evidence/security-gate-audit.jsonl`.
+Enforcement mecánico (§3–§4): `scripts/security-gate.ts` clasifica comandos y bloquea los
+patrones P5 canónicos y rutas sensibles cuando se invoca (directamente o desde flujos que lo
+cableen); el hook pre-commit (`install.sh --with-hooks`) impide commitear rutas sensibles y
+claves privadas en el diff staged. No sustituye el criterio humano: cubre la superficie
+determinable. El único escape es auditable: `DC_SECURITY_BYPASS="quién aprobó y cuándo"` se
+registra en `.evidence/security-gate-audit.jsonl`, y si la traza no puede escribirse, el
+bypass se deniega (fail-closed).
 
 ## 4. Rutas sensibles denegadas por defecto
 

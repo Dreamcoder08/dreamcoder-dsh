@@ -104,4 +104,47 @@ describe('evidence-ledger.ts', () => {
     assert.notEqual(r.status, 0)
     assert.match(r.stderr, /--mission es obligatorio/)
   })
+
+  describe('--sdd gate integration', () => {
+    const runGate = (cwd: string, args: string[]) =>
+      spawnSync(RUNNER, [join(import.meta.dirname, 'sdd-gate.ts'), ...args], { cwd, encoding: 'utf8' })
+
+    test('an incomplete SDD denies the receipt even with green checks', () => {
+      const { dir, baseSha } = initRepo()
+      assert.equal(runGate(dir, ['start', '--workflow', 'direct', '--mission', 'm1']).status, 0)
+      const r = runLedger(dir, [
+        '--mission', 'sdd-incomplete',
+        '--base', baseSha,
+        '--expected', '0',
+        '--sdd', 'm1',
+        '--check', 'ok', '--', RUNNER, '-e', 'process.exit(0)',
+      ])
+      assert.equal(r.status, 1)
+      const body = readFileSync(join(dir, '.evidence', evidenceFiles(dir)[0] as string), 'utf8')
+      assert.match(body, /verdict: FAIL/)
+    })
+
+    test('a completed SDD yields PASS and records the workflow in the receipt', () => {
+      const { dir, baseSha } = initRepo()
+      runGate(dir, ['start', '--workflow', 'direct', '--mission', 'm2'])
+      for (const stage of ['understand', 'change', 'verify', 'summarize']) {
+        assert.equal(
+          runGate(dir, ['advance', '--mission', 'm2', '--stage', stage, '--note', `ok ${stage}`]).status,
+          0,
+          stage,
+        )
+      }
+      const r = runLedger(dir, [
+        '--mission', 'sdd-complete',
+        '--base', baseSha,
+        '--expected', '0',
+        '--sdd', 'm2',
+        '--check', 'ok', '--', RUNNER, '-e', 'process.exit(0)',
+      ])
+      assert.equal(r.status, 0, r.stderr)
+      const body = readFileSync(join(dir, '.evidence', evidenceFiles(dir)[0] as string), 'utf8')
+      assert.match(body, /workflow: direct/)
+      assert.match(body, /complete: true/)
+    })
+  })
 })

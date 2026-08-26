@@ -92,8 +92,10 @@ fi
 echo "── 8. Proveedores de subagente (routing multi-provider)"
 # Señal correcta: la COMPOSICIÓN (dsh --dump-config), no el layout de
 # node_modules — que varía entre layouts pnpm/npm y es un detalle interno.
-DUMP="$(dsh --profile "$PROFILE" --dump-config 2>/tmp/dream-doctor-dump.err)"
-DUMP_ERR="$(cat /tmp/dream-doctor-dump.err 2>/dev/null || true)"
+DUMP_ERR_FILE="$(mktemp)"
+DUMP="$(dsh --profile "$PROFILE" --dump-config 2>"$DUMP_ERR_FILE")"
+DUMP_ERR="$(cat "$DUMP_ERR_FILE" 2>/dev/null || true)"
+rm -f "$DUMP_ERR_FILE"
 if echo "$DUMP_ERR" | grep -q 'not found'; then
   bad "patch huérfano detectado: $(echo "$DUMP_ERR" | grep 'not found' | head -2 | tr '\n' ' ')— reinstala los paquetes (install.sh --with-external-subagents) o limpia el patch"
 fi

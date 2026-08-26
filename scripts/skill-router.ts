@@ -69,13 +69,28 @@ export function parseFrontmatter(raw: string): {
 } {
   const parts = raw.split('---')
   const fm = parts.length >= 3 ? (parts[1] ?? '') : ''
-  const field = (key: string): string | undefined => {
-    const m = fm.match(new RegExp(`^${key}:[ \\t]*>?-?[ \\t]*\\n([\\s\\S]*?)(?=^[a-zA-Z_-]+:|\\Z)`, 'm'))
-    if (m !== null) return m[1]?.split('\n').map((l) => l.trim()).filter(Boolean).join(' ')
-    const inline = fm.match(new RegExp(`^${key}:[ \\t]*(.+)$`, 'm'))
-    return inline !== null ? inline[1]?.trim() : undefined
+  // Parser de bloque YAML simple: `clave: [marcador]` seguido de líneas
+  // indentadas (block scalars |, >, >- y variantes) o valor en la misma
+  // línea; termina en la siguiente clave top-level o fin del frontmatter.
+  const fields = new Map<string, string>()
+  let current: { key: string; value: string } | null = null
+  for (const line of fm.split('\n')) {
+    const keyMatch = line.match(/^([A-Za-z_-]+):[ \t]*(.*)$/)
+    if (keyMatch !== null) {
+      if (current !== null) fields.set(current.key, current.value.trim())
+      const marker = keyMatch[2] ?? ''
+      current = { key: keyMatch[1] ?? '', value: /^[|>][+-]?[0-9]*$/.test(marker.trim()) ? '' : marker }
+      continue
+    }
+    if (current !== null && /^[ \t]+\S/.test(line)) current.value += ' ' + line.trim()
+    else if (current !== null && line.trim() === '') current.value += ' '
   }
-  return { name: field('name'), description: field('description'), whenToUse: field('whenToUse') }
+  if (current !== null) fields.set(current.key, current.value.trim())
+  return {
+    name: fields.get('name'),
+    description: fields.get('description'),
+    whenToUse: fields.get('whenToUse'),
+  }
 }
 
 export function tokenize(text: string): Set<string> {
