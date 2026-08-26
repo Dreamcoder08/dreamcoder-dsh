@@ -12,7 +12,8 @@
     "install:dsh": "bash scripts/install.sh",
     "typecheck": "tsgo --noEmit",
     "test": "node --test 'scripts/*.test.ts'",
-    "verify": "node scripts/verify-compat.ts && node scripts/verify-presets.ts && node scripts/verify-contracts.ts"
+    "verify": "node scripts/verify-compat.ts && node scripts/verify-presets.ts && node scripts/verify-contracts.ts",
+    "bench": "node scripts/dream-bench.ts"
   },
   "devDependencies": {
     "@types/node": "^26.3.0",

@@ -208,8 +208,9 @@ implementa / verifica es estructural, no disciplinaria:
 | `bash scripts/install.sh --with-engram` | Ídem + overlay de memoria Engram |
 | `bash scripts/install.sh --with-hooks` | Ídem + hook pre-commit anti-secretos y hook pre-push (suite completa antes de publicar) |
 | `/dream-doctor` · `/dream-status` | Comandos in-session de la GUI (tras reiniciar dsh): corren doctor y métricas sin salir de la sesión |
-| `bash scripts/dream-doctor.sh` | Salud de la instalación en 12 chequeos (incluye postura de seguridad y vanguardia) |
+| `bash scripts/dream-doctor.sh` | Salud de la instalación en 13 chequeos (seguridad, vanguardia y procedencia SHA-256) |
 | `pnpm verify` | Compatibilidad contra DSH pineado + validación de presets + contratos |
+| `pnpm bench` | Mini-bench MODO DRIVEN: ejecuta los journeys de `bench/` y deja recibo en `.evidence/bench-latest.json` |
 | `pnpm typecheck` | `tsgo --noEmit` sobre todo el tooling |
 | `node scripts/red-green.ts` | Ciclo TDD completo RED→GREEN→TRIANGULATE→REFACTOR con evidencia |
 | `node scripts/evidence-ledger.ts` | Receipt de misión derivado de Git; `--sdd <misión>` exige el gate SDD |
@@ -253,6 +254,7 @@ Fases implementadas:
 - **M9** model routing explícito (política §8 + skill `model-router`), con routing por transporte y **providers externos codex/claude-code operativos** (`bash scripts/install.sh --with-external-subagents`; delegación cross-engine verificada end-to-end vía codex).
 - **M10** observabilidad: `dream-doctor.sh` (12 secciones) + `dream-metrics.ts` (tokens/task aprox, rework % derivado de Git, ciclos COMPLETE) + registros en `.evidence/`.
 - **M11** autonomía acotada: goals persistidos + jobs con límites duros (§9).
+- **M12** mini-bench driven: corpus de journeys `bench/` + runner `scripts/dream-bench.ts` — los tests validan declaraciones, solo el modo driven prueba ejecución (recibo en `.evidence/bench-latest.json`).
 
 Enforcement mecánico (misión "10/10"):
 
