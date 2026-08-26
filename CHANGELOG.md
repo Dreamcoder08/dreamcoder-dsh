@@ -7,6 +7,25 @@ y el versionado respeta [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Added (documentación)
+
+- **Suite documental deep-dive**: `docs/architecture.md` ampliado (145→400
+  líneas: composición del perfil, bundle Cordis entrada por entrada, presets
+  con sus campos de permisos reales, contratos SDD y decisiones D1–D5
+  ADR-style); `docs/skills-reference.md` reescrita como contrato por skill
+  (99→450 líneas: trigger/garantía/activación/E-S/modo de fallo + tablas de
+  flags y exit codes de los scripts compañeros leídos del código);
+  `docs/security.md` nueva (jerarquía P0–P5, rutas sensibles, bypass
+  auditable fail-closed, hooks, puente Claude Code y modelo de amenazas) y
+  `docs/evidence.md` nueva (ciclo TDD observado, receipt derivado de Git,
+  sdd-gate, mini-bench driven y presupuesto de contexto);
+  `docs/troubleshooting.md` ampliada con tabla de los 13 chequeos reales del
+  doctor y tres casos nuevos con salida verificada (EROFS del pre-push bajo
+  sandbox, symlink ssh de systemd-ssh-proxy, fallo ruidoso del hook bridge);
+  `CONTRIBUTING.md` con verificación local obligatoria y convenciones.
+  Correcciones de consistencia: `host.mjs` anunciaba "12 chequeos" (13
+  reales), roadmap M10 anotado.
+
 ### Added (fase 2 — cableado automático)
 
 - **Comandos in-session `/dream-doctor` y `/dream-status`**: el bundle exporta

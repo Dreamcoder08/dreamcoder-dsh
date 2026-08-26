@@ -35,7 +35,7 @@ function runScript(args, timeoutMs = 120000) {
 
 const DOCTOR = {
   name: 'dream-doctor',
-  description: 'Salud de la instalación Dreamcoder (12 chequeos con exit code agregado).',
+  description: 'Salud de la instalación Dreamcoder (13 chequeos con exit code agregado).',
   async handler() {
     const r = runScript(['bash', join(REPO_ROOT, 'scripts', 'dream-doctor.sh')])
     return r.ok

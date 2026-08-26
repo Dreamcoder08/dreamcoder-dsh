@@ -297,6 +297,9 @@ solo texto:
 
 No sustituye el criterio humano: cubre la superficie determinable.
 
+Referencia completa — jerarquía P0–P5, rutas sensibles, bypass auditable, hooks
+y modelo de amenazas: [`docs/security.md`](docs/security.md).
+
 ## Evidencia y receipts
 
 > **Confía en lo que el sistema puede derivar, no en lo que el agente afirma.**
@@ -312,6 +315,10 @@ funcionar" es hipótesis, no resultado.
   checks) y lo cierra con SHA256: el relato del agente no participa.
 
 Cuando sea barato, el flujo exige demostrar el par fallo→paso.
+
+Referencia completa — ciclo TDD observado, campos del receipt, sdd-gate,
+mini-bench driven y presupuesto de contexto:
+[`docs/evidence.md`](docs/evidence.md).
 
 ## Memoria
 
@@ -333,7 +340,7 @@ Fases implementadas:
 - **M7** evidence ledger con SHA256 derivado de Git (+ gate SDD opcional vía `--sdd`).
 - **M8** context governor: presupuestos (política §7) + gate mecánico `scripts/context-governor.ts` con eventos `context:ok|warning|critical` y contratos por etapa en `contracts/` verificados contra los workflows.
 - **M9** model routing explícito (política §8 + skill `model-router`), con routing por transporte y **providers externos codex/claude-code operativos** (`bash scripts/install.sh --with-external-subagents`; delegación cross-engine verificada end-to-end vía codex).
-- **M10** observabilidad: `dream-doctor.sh` (12 secciones) + `dream-metrics.ts` (tokens/task aprox, rework % derivado de Git, ciclos COMPLETE) + registros en `.evidence/`.
+- **M10** observabilidad: `dream-doctor.sh` (12 secciones en su origen; 13 hoy) + `dream-metrics.ts` (tokens/task aprox, rework % derivado de Git, ciclos COMPLETE) + registros en `.evidence/`.
 - **M11** autonomía acotada: goals persistidos + jobs con límites duros (§9).
 - **M12** mini-bench driven: corpus de journeys `bench/` + runner `scripts/dream-bench.ts` — los tests validan declaraciones, solo el modo driven prueba ejecución (recibo en `.evidence/bench-latest.json`).
 - **M13** specs canónicas SDD: `scripts/sdd-specs.ts` persiste la spec de cada misión alineada con su contrato (`sync`) y la archiva con SHA-256 (`archive`, fail-closed).
