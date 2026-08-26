@@ -11,6 +11,10 @@
 #   7. evidencia reciente (.evidence/)
 #   8. proveedores de subagente (core instalados; externos opcionales detectados)
 #   9. contratos por etapa (contracts/ vs workflows/)
+#  10. postura de seguridad mecánica (security-gate, hook, permission mode)
+#  11. gates SDD y presupuesto de skills
+#  12. vanguardia (pin local vs upstream, cache offline)
+#  13. procedencia de la instalación (manifiesto SHA-256 vs ~/.dsh)
 #
 # Uso: bash scripts/dream-doctor.sh [--profile engineering]
 set -uo pipefail
@@ -88,16 +92,21 @@ fi
 echo "── 8. Proveedores de subagente (routing multi-provider)"
 # Señal correcta: la COMPOSICIÓN (dsh --dump-config), no el layout de
 # node_modules — que varía entre layouts pnpm/npm y es un detalle interno.
-DUMP="$(dsh --profile "$PROFILE" --dump-config 2>/dev/null)"
+DUMP="$(dsh --profile "$PROFILE" --dump-config 2>/tmp/dream-doctor-dump.err)"
+DUMP_ERR="$(cat /tmp/dream-doctor-dump.err 2>/dev/null || true)"
+if echo "$DUMP_ERR" | grep -q 'not found'; then
+  bad "patch huérfano detectado: $(echo "$DUMP_ERR" | grep 'not found' | head -2 | tr '\n' ' ')— reinstala los paquetes (install.sh --with-external-subagents) o limpia el patch"
+fi
 if [ -n "$DUMP" ]; then
   for prov in spawn fork; do
     if echo "$DUMP" | grep -q "providerName: $prov"; then ok "provider '$prov' compuesto"; else bad "falta el provider '$prov' (debería venir con dsh-base)"; fi
   done
   # Externos: OPCIONALES. Instalados vía `bash scripts/install.sh --with-external-subagents`
-  # (pin @next = 0.1.1-rc.x, compatible con el core moderno). El doctor solo
-  # DETECTA — jamás se simula un routing que no existe.
+  # (pin @next = 0.1.1-rc.x, compatible con el core moderno). El dump los
+  # renderiza como filas `id: subagent-<provider>` (NO como providerName).
+  # El doctor solo DETECTA — jamás se simula un routing que no existe.
   for ext in codex claude-code; do
-    if echo "$DUMP" | grep -q "providerName: $ext"; then
+    if echo "$DUMP" | grep -q "id: subagent-$ext\$"; then
       ok "provider externo '$ext' compuesto (routing disponible)"
     else
       info "provider externo '$ext' ausente — opcional: bash scripts/install.sh --with-external-subagents"
@@ -133,6 +142,47 @@ if command -v node >/dev/null 2>&1 && node "$REPO_ROOT/scripts/verify-contracts.
   ok "contratos válidos y consistentes con workflows/ (verify-contracts)"
 else
   bad "verify-contracts falla — corre node scripts/verify-contracts.ts para el detalle"
+fi
+
+echo "── 10. Postura de seguridad mecánica (P0–P5)"
+if [ -f "$REPO_ROOT/scripts/security-gate.ts" ]; then
+  ok "security-gate disponible (deny-list P5 + rutas sensibles §3–§4)"
+else
+  bad "falta scripts/security-gate.ts"
+fi
+HOOK="$REPO_ROOT/.git/hooks/pre-commit"
+if [ -x "$HOOK" ] && grep -q "security-gate" "$HOOK" 2>/dev/null; then
+  ok "hook pre-commit instalado (stage-check anti-secretos)"
+else
+  info "hook pre-commit ausente — opcional: bash scripts/install.sh --with-hooks"
+fi
+MODE="${DSH_PERMISSION_MODE:-workspace-write}"
+if [ "$MODE" = "danger-full-access" ]; then
+  bad "DSH_PERMISSION_MODE=danger-full-access — el sandbox y las aprobaciones quedan sin dientes (§3)"
+else
+  ok "DSH_PERMISSION_MODE=$MODE (sandbox y approval activos por defecto)"
+fi
+
+echo "── 11. Gates SDD y presupuesto de skills"
+[ -f "$REPO_ROOT/scripts/sdd-gate.ts" ] && ok "sdd-gate disponible (orden de etapas exigido en runtime)" || bad "falta scripts/sdd-gate.ts"
+[ -f "$REPO_ROOT/scripts/skill-router.ts" ] && ok "skill-router disponible (presupuesto máx 3, §10)" || bad "falta scripts/skill-router.ts"
+
+echo "── 12. Vanguardia (pin vs upstream)"
+GUARD="$(node "$REPO_ROOT/scripts/update-guard.ts" --offline 2>/dev/null)" && {
+  echo "$GUARD" | grep -q '✔' && ok "$(echo "$GUARD" | tail -n1)" || info "update-guard: $(echo "$GUARD" | head -n1) — corre 'node scripts/update-guard.ts' con red para refrescar el cache"
+} || info "update-guard no ejecutable en este entorno"
+
+echo "── 13. Procedencia de la instalación (SHA-256)"
+if [ -f "$REPO_ROOT/scripts/dream-manifest.sh" ]; then
+  MANIFEST_OUT="$(bash "$REPO_ROOT/scripts/dream-manifest.sh" verify "$DSH_HOME" "$PROFILE")"
+  MANIFEST_RC=$?
+  case "$MANIFEST_RC" in
+    0) ok "$MANIFEST_OUT" ;;
+    3) info "$MANIFEST_OUT — opcional: bash scripts/install.sh lo genera" ;;
+    *) bad "$MANIFEST_OUT" ;;
+  esac
+else
+  bad "falta scripts/dream-manifest.sh (gate de procedencia §5)"
 fi
 
 echo
