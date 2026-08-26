@@ -136,7 +136,8 @@ Qué hace el instalador:
 4. Enlaza las 7 skills en `$DSH_HOME/skills`.
 5. Con `--with-engram`, registra el overlay MCP `memory/engram.cordis.yml` en la
    **capa global** (`$DSH_HOME/cordis.patch.yml`): una sola fila para todos los
-   perfiles; migra instalaciones viejas que la tuvieran en el patch del perfil.
+   perfiles; migra instalaciones viejas que la tuvieran en el patch de
+   CUALQUIER perfil (con backup y validación de composición por perfil).
 
 `DSH_HOME` respeta su valor de entorno (default: `~/.dsh`); la instalación es
 idempotente y puede re-ejecutarse sin efectos residuales.

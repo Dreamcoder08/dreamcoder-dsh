@@ -76,9 +76,17 @@ if command -v engram >/dev/null 2>&1; then
 else
   info "engram no instalado — memoria longitudinal deshabilitada (opcional)"
 fi
-if grep -Eq '^[[:space:]]*-[[:space:]]+id:[[:space:]]*memory-engram([[:space:]]|$)' "$DSH_HOME/cordis.patch.yml" 2>/dev/null; then
+# Cuatro estados mutuamente excluyentes: el duplicado (ambas capas) es el
+# estado ROTO documentado y debe verse como ✘, nunca enmascararse como ✔.
+ENGRAM_ROW_RE='^[[:space:]]*-[[:space:]]+id:[[:space:]]*memory-engram([[:space:]]|$)'
+ENGRAM_GLOBAL=0; ENGRAM_PROFILE=0
+grep -Eq "$ENGRAM_ROW_RE" "$DSH_HOME/cordis.patch.yml" 2>/dev/null && ENGRAM_GLOBAL=1
+grep -Eq "$ENGRAM_ROW_RE" "$DSH_HOME/profiles/$PROFILE/cordis.patch.yml" 2>/dev/null && ENGRAM_PROFILE=1
+if [ "$ENGRAM_GLOBAL" -eq 1 ] && [ "$ENGRAM_PROFILE" -eq 1 ]; then
+  bad "fila memory-engram EN AMBAS capas — el perfil no arranca ('duplicate loader entry id'); re-ejecuta bash scripts/install.sh --with-engram (auto-migra todos los perfiles)"
+elif [ "$ENGRAM_GLOBAL" -eq 1 ]; then
   ok "overlay Engram en la capa global (todos los perfiles)"
-elif grep -Eq '^[[:space:]]*-[[:space:]]+id:[[:space:]]*memory-engram([[:space:]]|$)' "$DSH_HOME/profiles/$PROFILE/cordis.patch.yml" 2>/dev/null; then
+elif [ "$ENGRAM_PROFILE" -eq 1 ]; then
   info "overlay Engram en el patch del perfil (formato viejo; re-ejecuta install.sh --with-engram para migrarlo a la capa global)"
 else
   info "overlay Engram no habilitado (bash scripts/install.sh --with-engram)"

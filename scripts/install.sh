@@ -2,7 +2,8 @@
 # install.sh — instala el perfil `engineering` de Dreamcoder sobre DeepSeek Harness.
 #
 # Idempotente: puede ejecutarse repetidamente sin efectos residuales.
-# No modifica el core de DSH ni ~/.dsh/cordis.patch.yml (la capa global del usuario).
+# No modifica el core de DSH. Única excepción: --with-engram escribe la capa
+# global ~/.dsh/cordis.patch.yml (con backup previo y validación, sección 4).
 #
 # Uso:
 #   bash scripts/install.sh                  # perfil + política + presets
@@ -167,13 +168,16 @@ PROFILE_PATCH="$PROFILE_DIR/cordis.patch.yml"
 ENGRAM_BLOCK="# ── Memoria longitudinal (Engram vía MCP) — capa global, gestionado por install.sh ──
 $(cat "$REPO_ROOT/memory/engram.cordis.yml")
 "
+# Detector ESTRICTO único para todo el flujo (instalación, migración y doctor):
+# solo la fila real `- id: memory-engram`; las menciones en comentarios no
+# cuentan. Un solo patrón, cero desviaciones entre pre-chequeo y post-chequeo.
+ENGRAM_ROW_RE='^[[:space:]]*-[[:space:]]+id:[[:space:]]*memory-engram([[:space:]]|$)'
 if $WITH_ENGRAM; then
   command -v engram >/dev/null 2>&1 \
     || { echo "ERROR: --with-engram requiere el binario 'engram' en PATH (pin v1.20.0)" >&2; exit 1; }
 
-  # 4.a Garantizar la fila en la capa global (idempotente). Detección ESTRICTA:
-  # solo cuenta la fila real (`- id: memory-engram`), no menciones en comentarios.
-  if [ -f "$GLOBAL_PATCH" ] && grep -Eq '^[[:space:]]*-[[:space:]]+id:[[:space:]]*memory-engram([[:space:]]|$)' "$GLOBAL_PATCH"; then
+  # 4.a Garantizar la fila en la capa global (idempotente).
+  if [ -f "$GLOBAL_PATCH" ] && grep -Eq "$ENGRAM_ROW_RE" "$GLOBAL_PATCH"; then
     echo "==> Overlay Engram ya presente en la capa global ($GLOBAL_PATCH)"
   elif [ ! -f "$GLOBAL_PATCH" ]; then
     printf '%s\n' "$ENGRAM_BLOCK" > "$GLOBAL_PATCH"
@@ -188,6 +192,7 @@ if $WITH_ENGRAM; then
     cp "$GLOBAL_PATCH" "$BACKUP"
     printf '\n%s\n' "$ENGRAM_BLOCK" >> "$GLOBAL_PATCH"
     if dsh --profile "$PROFILE_NAME" --dump-config >/dev/null 2>&1; then
+      rm -f "$BACKUP"   # éxito sin residuos: el backup solo sobrevive a un fallo
       echo "==> Overlay Engram añadido a la capa global $GLOBAL_PATCH (composición validada)"
     else
       mv "$BACKUP" "$GLOBAL_PATCH"
@@ -196,46 +201,40 @@ if $WITH_ENGRAM; then
     fi
   fi
 
-  # 4.b Auto-reparación: retirar la fila del patch del perfil si aún vive ahí
-  # (duplicaría el id contra la capa global y rompería el arranque). Detección
-  # estricta de la fila real; menciones en comentarios no cuentan.
-  if grep -Eq '^[[:space:]]*-[[:space:]]+id:[[:space:]]*memory-engram([[:space:]]|$)' "$PROFILE_PATCH" 2>/dev/null; then
-    BACKUP="$PROFILE_PATCH.backup.$(date +%Y%m%d-%H%M%S)"
-    cp "$PROFILE_PATCH" "$BACKUP"
-    if node --input-type=module -e '
-import { readFileSync, writeFileSync } from "node:fs";
-const [path] = process.argv.slice(1);
-const lines = readFileSync(path, "utf8").split("\n");
-const idIdx = lines.findIndex((l) => /^\s*- id: memory-engram\s*$/.test(l));
-if (idIdx === -1) process.exit(0);
-// Subir desde la fila hasta "- insert:" pasando por líneas indentadas
-// (config del insert) y comentarios contiguos que encabezan el bloque.
-let start = idIdx;
-while (start > 0 && (/^\s/.test(lines[start - 1]) || /^#/.test(lines[start - 1]))) start--;
-if (start > 0 && /^- insert:\s*$/.test(lines[start - 1])) {
-  start--;
-  while (start > 0 && /^#/.test(lines[start - 1])) start--;
-}
-// Bajar hasta la primera línea que ya no sea parte del bloque insert.
-let end = idIdx + 1;
-while (end < lines.length && (/^\s/.test(lines[end]) || lines[end] === "")) end++;
-lines.splice(start, end - start);
-writeFileSync(path, lines.join("\n"));
-' "$PROFILE_PATCH"; then
-      if dsh --profile "$PROFILE_NAME" --dump-config >/dev/null 2>&1 \
-         && ! grep -q "memory-engram" "$PROFILE_PATCH"; then
+  # 4.b Auto-reparación EN TODOS LOS PERFILES: la plantilla vieja dejaba la
+  # fila en el patch de CUALQUIER perfil, no solo `engineering` — dejarla ahí
+  # duplica el id contra la capa global y rompe ese perfil. La remoción la hace
+  # scripts/migrate-engram-row.mjs (por bloques top-level, quirúrgica con filas
+  # hermanas, falla ruidosa ante estructura desconocida); toda mutación va con
+  # backup + validación de composición del propio perfil, con rollback.
+  shopt -s nullglob
+  for profile_patch in "$DSH_HOME"/profiles/*/cordis.patch.yml; do
+    prof="$(basename "$(dirname "$profile_patch")")"
+    grep -Eq "$ENGRAM_ROW_RE" "$profile_patch" || continue
+    BACKUP="$profile_patch.backup.$(date +%Y%m%d-%H%M%S)"
+    cp "$profile_patch" "$BACKUP"
+    if node "$REPO_ROOT/scripts/migrate-engram-row.mjs" "$profile_patch"; then
+      if dsh --profile "$prof" --dump-config >/dev/null 2>&1 \
+         && ! grep -Eq "$ENGRAM_ROW_RE" "$profile_patch"; then
         rm -f "$BACKUP"
-        echo "==> Migración completa: fila retirada de $PROFILE_PATCH (vivía duplicada)"
+        echo "==> Migración completa: fila retirada de $profile_patch (perfil '$prof', vivía duplicada)"
       else
-        mv "$BACKUP" "$PROFILE_PATCH"
-        echo "AVISO: no pude retirar la fila del patch del perfil sin romperlo; restaurado." >&2
-        echo "  Retírala a mano de $PROFILE_PATCH: duplica el id contra la capa global." >&2
+        mv "$BACKUP" "$profile_patch"
+        echo "AVISO: no pude retirar la fila de $profile_patch sin romper el perfil '$prof'; restaurado." >&2
+        echo "  Retírala a mano: duplica el id contra la capa global." >&2
       fi
     else
-      mv "$BACKUP" "$PROFILE_PATCH"
-      echo "AVISO: edición del patch del perfil falló; restaurado desde $BACKUP." >&2
+      node_rc=$?
+      mv "$BACKUP" "$profile_patch"
+      if [ "$node_rc" -eq 3 ]; then
+        echo "AVISO: $profile_patch tiene estructura no reconocida junto a la fila; restaurado intacto." >&2
+      else
+        echo "AVISO: edición de $profile_patch falló; restaurado desde $BACKUP." >&2
+      fi
+      echo "  Retírala a mano: duplica el id contra la capa global." >&2
     fi
-  fi
+  done
+  shopt -u nullglob
 fi
 
 # ── 4b. Overlay de subagentes externos (opcional, --with-external-subagents) ─

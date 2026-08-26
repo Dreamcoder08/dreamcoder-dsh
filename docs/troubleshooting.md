@@ -163,10 +163,11 @@ duplicados entre capas; desde la capa global existe, ningún patch de perfil
 debe repetirla.
 
 **Remedio.** Re-ejecutá `bash scripts/install.sh --with-engram`: la sección 4
-detecta la duplicación y migra automáticamente (retira la fila del patch del
-perfil con backup y valida la composición). Si preferís hacerlo a mano,
-borrá el bloque `- insert:` con `id: memory-engram` del patch del perfil y
-dejalo solo en la capa global.
+detecta la duplicación y migra automáticamente TODOS los perfiles (retira la
+fila de cada patch con backup, valida la composición de ese perfil y hace
+rollback ante cualquier duda). Si preferís hacerlo a mano, borrá el bloque
+`- insert:` con `id: memory-engram` del patch del perfil y dejalo solo en la
+capa global.
 
 ### Una skill no aparece en la sesión
 
@@ -224,10 +225,16 @@ local.
 El instalador respalda antes de sobreescribir, con timestamp:
 
 - `$DSH_HOME/AGENTS.md.backup.<timestamp>` — política previa distinta.
-- `$DSH_HOME/profiles/engineering/cordis.patch.yml.backup.<timestamp>` — patch
-  con contenido propio cuando un overlay se fusiona con append-and-verify.
+- `$DSH_HOME/cordis.patch.yml.backup.<timestamp>` — capa global previa cuando
+  `--with-engram` añade el overlay con append-and-verify.
+- `$DSH_HOME/profiles/<perfil>/cordis.patch.yml.backup.<timestamp>` — patch de
+  un perfil cuando un overlay se fusiona con append-and-verify o cuando la
+  auto-migración Engram retira la fila duplicada de ese perfil.
 - `.git/hooks/pre-commit.backup.<timestamp>` y
   `.git/hooks/pre-push.backup.<timestamp>` — hooks ajenos (husky/gitleaks…).
+
+Los backups son residuo de FALLO: una mutación que validó y publicó borra su
+backup en el acto; solo sobrevive el de una operación que terminó en rollback.
 
 Para revertir manualmente, restaurá el backup más reciente de la pieza
 afectada y re-ejecutá el doctor: el chequeo 13 compara SHA-256 contra el
