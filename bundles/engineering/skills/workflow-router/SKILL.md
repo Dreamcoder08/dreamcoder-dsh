@@ -29,7 +29,7 @@ Load cuando llega una tarea nueva sin clasificar y hay que decidir cómo ejecuta
 | P2 | mini-sdd | Especificación breve + diseño + lista de tareas antes de implementar (`workflows/mini-sdd.md`) |
 | P3 | full-sdd | Ciclo SDD completo: spec, diseño, plan por fases, verificación formal y revisión con review-4r (`workflows/full-sdd.md`) |
 
-Los docs autoritativos viven en el directorio `workflows/` de este bundle-repo; si un doc contradice esta tabla o aún no existe, manda el doc y decláralo explícitamente en tu resultado.
+Los docs autoritativos viajan con esta skill como archivos de soporte: resuélvelos contra el directorio base de la skill (`workflows/direct.md`, `workflows/mini-sdd.md`, `workflows/full-sdd.md` relativos a esta skill). Si un doc contradice esta tabla o aún no existe, manda el doc y decláralo explícitamente en tu resultado.
 
 ## Regla de Oro
 
@@ -63,4 +63,4 @@ Si escalaste por duda, añade una línea `Escalar: <motivo>` citando la puerta a
 
 ## References
 
-No supporting files. Docs de workflow del bundle-repo: `workflows/direct.md` (P0–P1), `mini-sdd.md` (P2) y `full-sdd.md` (P3); también `policy/AGENTS.md` si existe.
+Supporting files (relativos al directorio base de esta skill): `workflows/direct.md` (P0–P1), `workflows/mini-sdd.md` (P2) y `workflows/full-sdd.md` (P3); fuente canónica en el repo del bundle (`workflows/` raíz), sincronizada a esta carpeta. `policy/AGENTS.md` si existe.
