@@ -1,17 +1,22 @@
 #!/usr/bin/env node
-// red-green.ts — evidencia observable de un ciclo RED→GREEN de TDD.
+// red-green.ts — evidencia observable del ciclo TDD completo
+// RED → GREEN → TRIANGULATE → REFACTOR (skill tdd-evidence).
 //
-// El ciclo se registra en DOS fases con una ventana de edición real entre
-// ellas (el agente corrige el código entre ambos comandos):
-//
-//   node scripts/red-green.ts record-red  -- <comando de test [args…]>
+//   node scripts/red-green.ts record-red         -- <comando de test [args…]>
 //   ...editar código...
-//   node scripts/red-green.ts record-green -- <comando de test [args…]>
+//   node scripts/red-green.ts record-green       -- <comando de test [args…]>
+//   ...añadir caso que generaliza...
+//   node scripts/red-green.ts record-triangulate -- <comando de test [args…]>
+//   ...refactorizar sin cambiar comportamiento...
+//   node scripts/red-green.ts record-refactor    -- <comando de test [args…]>
 //
-// record-red exige fallo (exit ≠ 0) y deja el ciclo pendiente en
-// .evidence/red-green.pending.json. record-green exige pase (exit = 0),
-// valida el par y escribe .evidence/red-green-<ts>.json definitivo.
-// Exit code 0 solo en un ciclo RED→GREEN completo y válido.
+// record-red exige fallo (exit ≠ 0); record-green exige pase y cierra el par
+// escribiendo .evidence/red-green-<ts>.json más un puntero
+// .evidence/red-green.latest.json. TRIANGULATE exige un ciclo previo sin
+// triangulación registrada y un pase (el segundo caso confirma la
+// generalización). REFACTOR exige triangulación previa y un pase posterior a
+// la refactorización; al completarse marca el ciclo COMPLETE.
+// Exit code 0 solo en una fase válida del ciclo.
 //
 // Se ejecuta con el type-stripping nativo de Node (≥22.18): sin build ni
 // dependencias de runtime. Solo sintaxis erasable (ver tsconfig).
@@ -38,20 +43,27 @@ interface CycleRecord {
   expectation: string
   red: CommandRun
   green: CommandRun
+  triangulate?: CommandRun
+  refactor?: CommandRun
+  complete: boolean
   capturedAt: string
 }
 
+const PHASES = ['record-red', 'record-green', 'record-triangulate', 'record-refactor'] as const
+
 const USAGE =
   'Uso:\n' +
-  '  node scripts/red-green.ts record-red   -- <comando de test [args…]>\n' +
-  '  node scripts/red-green.ts record-green -- <comando de test [args…]>\n'
+  '  node scripts/red-green.ts record-red         -- <comando de test [args…]>\n' +
+  '  node scripts/red-green.ts record-green       -- <comando de test [args…]>\n' +
+  '  node scripts/red-green.ts record-triangulate -- <comando de test [args…]>\n' +
+  '  node scripts/red-green.ts record-refactor    -- <comando de test [args…]>\n'
 
 const argv: readonly string[] = process.argv
 const sep: number = argv.indexOf('--')
 const phase: string | undefined = argv[2]
 if (
   phase === undefined ||
-  (phase !== 'record-red' && phase !== 'record-green') ||
+  !PHASES.includes(phase as (typeof PHASES)[number]) ||
   sep === -1 ||
   sep + 1 >= argv.length
 ) {
@@ -94,6 +106,53 @@ if (phase === 'record-red') {
   process.exit(0)
 }
 
+// Fases posteriores al par: operan sobre el último ciclo cerrado (puntero).
+const latestPath = join(evidenceDir, 'red-green.latest.json')
+
+if (phase === 'record-triangulate' || phase === 'record-refactor') {
+  if (!existsSync(latestPath)) {
+    console.error(`✘ No hay ciclo RED→GREEN previo (${latestPath}). Cierra un par antes de ${phase}.`)
+    process.exit(1)
+  }
+  let latest: { file: string }
+  try {
+    latest = JSON.parse(readFileSync(latestPath, 'utf8')) as { file: string }
+  } catch {
+    console.error(`✘ ${latestPath} no es JSON válido.`)
+    process.exit(1)
+  }
+  if (!existsSync(latest.file)) {
+    console.error(`✘ El ciclo apuntado no existe: ${latest.file}`)
+    process.exit(1)
+  }
+  const record = JSON.parse(readFileSync(latest.file, 'utf8')) as CycleRecord
+  if (phase === 'record-triangulate' && record.triangulate !== undefined) {
+    console.error('✘ Este ciclo ya tiene TRIANGULATE registrado.')
+    process.exit(1)
+  }
+  if (phase === 'record-refactor' && record.triangulate === undefined) {
+    console.error('✘ REFACTOR exige TRIANGULATE registrado primero (tdd-evidence).')
+    process.exit(1)
+  }
+  const runResult = run()
+  console.error(`==> ${phase.toUpperCase()} terminó con exit code ${runResult.exitCode}`)
+  if (runResult.exitCode !== 0) {
+    console.error(`✘ La fase ${phase} exige que el comando pase (exit 0); el ciclo queda como está.`)
+    process.exit(1)
+  }
+  if (phase === 'record-triangulate') record.triangulate = runResult
+  else record.refactor = runResult
+  record.complete =
+    record.cycle === 'VALID' && record.triangulate !== undefined && record.refactor !== undefined
+  writeFileSync(latest.file, JSON.stringify(record, null, 2) + '\n')
+  if (record.complete) {
+    console.log(`✔ Ciclo TDD COMPLETE (RED→GREEN→TRIANGULATE→REFACTOR) — evidencia: ${latest.file}`)
+  } else {
+    console.log(`✔ ${phase} registrado — evidencia: ${latest.file}`)
+  }
+  process.exit(0)
+}
+
 // record-green
 if (!existsSync(pendingPath)) {
   console.error('✘ No hay RED pendiente. Registra primero: node scripts/red-green.ts record-red -- <cmd>')
@@ -118,13 +177,15 @@ const record: CycleRecord = {
   expectation: 'RED falla y GREEN pasa',
   red: pending.red,
   green,
+  complete: false,
   capturedAt: new Date().toISOString(),
 }
 const file: string = join(evidenceDir, `red-green-${Date.now()}.json`)
 rmSync(pendingPath)
 writeFileSync(file, JSON.stringify(record, null, 2) + '\n')
+writeFileSync(latestPath, JSON.stringify({ file }, null, 2) + '\n')
 if (valid) {
-  console.log(`✔ Ciclo RED→GREEN VÁLIDO — evidencia: ${file}`)
+  console.log(`✔ Ciclo RED→GREEN VÁLIDO — evidencia: ${file}\n  Continúa con record-triangulate y record-refactor.`)
   process.exit(0)
 } else {
   console.error(`✘ Ciclo INVÁLIDO — evidencia: ${file}`)
