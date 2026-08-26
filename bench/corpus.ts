@@ -65,20 +65,27 @@ export const journeys: readonly Journey[] = [
   {
     id: 'j2',
     title: 'sdd-gate exige orden estricto de etapas del workflow',
-    why: 'Contratos contracts/*.json: el contrato direct exige orden understand→change→verify→publish; saltarse una etapa viola el gate (mini-sdd §8 Verify independently).',
+    why: 'Contrato contracts/direct.json: orden estricto understand→change→verify→summarize; saltarse una etapa viola el gate (mini-sdd §8 Verify independently).',
     axis: 'gates',
     steps: [
       {
+        // Id único por corrida (el runner inyecta DSH_BENCH_RUN_ID): dos
+        // benches concurrentes no colisionan sobre el estado SDD compartido.
+        // El rm previo auto-repara una corrida anterior muerta a medio camino.
         name: 'misión direct arranca en understand',
-        shell: 'node scripts/sdd-gate.ts start --workflow direct --mission dream-bench-j2',
+        shell:
+          'M="dream-bench-j2-${DSH_BENCH_RUN_ID:-manual}"; ' +
+          'rm -f ".evidence/sdd-$M.json" && ' +
+          'node scripts/sdd-gate.ts start --workflow direct --mission "$M"',
         expectExit: 0,
       },
       {
         name: 'saltar a verify sin change/verify previos VIOLA el gate',
         shell:
-          'node scripts/sdd-gate.ts advance --mission dream-bench-j2 --stage verify --note "salto" ; ' +
+          'M="dream-bench-j2-${DSH_BENCH_RUN_ID:-manual}"; ' +
+          'node scripts/sdd-gate.ts advance --mission "$M" --stage verify --note "salto" ; ' +
           'test $? -eq 1 ; ' +
-          'rm -f .evidence/sdd-dream-bench-j2.json',
+          'rm -f ".evidence/sdd-$M.json"',
         expectExit: 0,
         expectStderr: /GATE VIOLADO/,
       },
@@ -122,12 +129,20 @@ export const journeys: readonly Journey[] = [
     axis: 'observability',
     steps: [
       {
-        name: 'governor corre y emite context:ok|warning|critical',
-        shell: 'node scripts/context-governor.ts',
-        // Cualquiera de los cuatro códigos documentados es un veredicto válido;
-        // lo que NO vale es crashear (5) o mal-uso de CLI (4).
-        expectExit: [0, 1, 2, 3],
-        expectStdout: /context:(ok|warning|critical)/,
+        // Contrato REAL del governor (scripts/context-governor.ts): los
+        // veredictos 0/1/2 emiten context:ok|warning|critical; el exit 3
+        // ("sin datos") escribe SOLO en stderr un aviso de limitación
+        // declarada. La expectativa exige la combinación COHERENTE, no solo
+        // el exit code.
+        name: 'governor emite veredicto coherente o limitación declarada',
+        shell:
+          'out=$(node scripts/context-governor.ts 2>&1); rc=$?; echo "$out"; ' +
+          'case $rc in ' +
+          '  0|1|2) echo "$out" | grep -Eq "context:(ok|warning|critical)" ;; ' +
+          '  3) echo "$out" | grep -q "sin datos" ;; ' +
+          '  *) false ;; ' +
+          'esac',
+        expectExit: 0,
       },
     ],
   },

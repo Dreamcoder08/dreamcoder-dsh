@@ -14,13 +14,16 @@
 // Se ejecuta con type-stripping nativo de Node (≥26): sin build, sin deps.
 
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, realpathSync, writeFileSync } from 'node:fs'
+import { mkdirSync, realpathSync, renameSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { join, resolve } from 'node:path'
 import { journeys, AXES, type Journey, type BenchStep } from '../bench/corpus.ts'
 
 const REPO_ROOT = resolve(import.meta.dirname, '..')
 const EVIDENCE_DIR = join(REPO_ROOT, '.evidence')
+
+/** Id único de corrida: journeys que tocan estado compartido lo usan para no colisionar. */
+export const RUN_ID = `${process.pid}-${Date.now()}`
 
 export interface StepResult {
   name: string
@@ -98,6 +101,7 @@ export function runJourney(j: Journey): JourneyResult {
       encoding: 'utf8',
       timeout: 120_000,
       maxBuffer: 8 * 1024 * 1024,
+      env: { ...process.env, DSH_BENCH_RUN_ID: RUN_ID },
     })
     const verdict = evaluateStep(step, { status: res.status, stdout: res.stdout ?? '', stderr: res.stderr ?? '' })
     if (!verdict.ok) {
@@ -112,12 +116,18 @@ function writeReceipt(results: JourneyResult[], completed: number, failed: numbe
   const receipt = {
     kind: 'dream-bench',
     drivenMode: true,
+    runId: RUN_ID,
     corpusSize: results.length,
     totals: { completed, failed },
     journeys: results,
   }
-  writeFileSync(join(EVIDENCE_DIR, `bench-${Date.now()}.json`), JSON.stringify(receipt, null, 2))
-  writeFileSync(join(EVIDENCE_DIR, 'bench-latest.json'), JSON.stringify(receipt, null, 2))
+  // Escritura atómica (tmp + rename): dos benches concurrentes nunca dejan un
+  // bench-latest.json a medias; el último rename gana, sin corrupción.
+  const tmp = `${EVIDENCE_DIR}/bench-latest.json.tmp-${RUN_ID}`
+  writeFileSync(tmp, JSON.stringify(receipt, null, 2))
+  renameSync(tmp, join(EVIDENCE_DIR, 'bench-latest.json'))
+  const stamp = `${EVIDENCE_DIR}/bench-${Date.now()}.json`
+  writeFileSync(stamp, JSON.stringify(receipt, null, 2))
 }
 
 function main(): number {
