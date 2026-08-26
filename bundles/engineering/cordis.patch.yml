@@ -110,6 +110,33 @@
     summarizationModel: deepseek-v4-flash-free
 
 # -----------------------------------------------------------------------------
+# Override 3 — repeat-tool-reminder (@deepseek-ai/dsh-repeat-tool-reminder).
+# El guard ya viene ACTIVO en el bundle base (thresholds [3,5,8]); este override
+# lo afina para ingeniería disciplinada. El override REEMPLAZA la config
+# completa de la fila, así que restituye los valores del base y añade `exclude`:
+# las tools excluidas son TRANSPARENTES a la cadena de detección (ni
+# incrementan ni resetean el contador), de modo que un bucle del tipo
+# `grep X → todo_write → grep X` cuenta como repeticiones consecutivas de grep
+# en vez de lavarse con la llamada de contabilidad intercalada. Base del
+# contrato: packages/guard/repeat-tool-reminder/README.md § Chain semantics.
+#
+# NOTA timeout-policy — el companion @deepseek-ai/dsh-tool-call-timeout-policy
+# también está activo en el bundle base (fila `timeout-policy`) y es
+# zero-config por diseño: lee el presupuesto timeoutMs declarado por cada tool
+# en su propia ToolDefinition. No lleva override ni lo necesita.
+# -----------------------------------------------------------------------------
+- id: repeat-tool-reminder
+  config:
+    thresholds: [3, 5, 8]
+    argumentsPreviewChars: 500
+    exclude:
+      - todo_write          # contabilidad de progreso del propio pipeline
+      - ask_user_question   # etapa Clarify: interacción humana legítima entre intentos
+    # NOTA tradeoff: las tools excluidas jamás son tracked, así que un bucle DE
+    # la propia ask_user_question idéntica queda sin recordatorio — coste
+    # aceptado: el usuario es el recordatorio natural de esa tool.
+
+# -----------------------------------------------------------------------------
 # NOTA — skills del bundle.
 # Este bundle ya NO registra `customSkillDirs`: las skills se exponen por la
 # raíz de usuario por defecto de dsh-skill-filesystem (`<dshHome>/skills`),
