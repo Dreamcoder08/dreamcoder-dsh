@@ -50,6 +50,12 @@ if (dump.status !== 0) {
 }
 const config = dump.stdout ?? ''
 
+check(
+  'sin patches huérfanos (overrides apuntando a filas ausentes)',
+  !/not found/.test(dump.stderr ?? ''),
+  (dump.stderr ?? '').split('\n').filter((l) => l.includes('not found')).slice(0, 2).join(' | ') || 'limpio',
+)
+
 console.log('==> Afirmaciones de composición:')
 check('fila system-prompt presente', /id: system-prompt/.test(config))
 check(
@@ -79,6 +85,11 @@ for (const dir of [
   'scripts/red-green.ts',
   'scripts/evidence-ledger.ts',
   'scripts/dream-doctor.sh',
+  // Gates mecánicos y observabilidad (misión "10/10"):
+  'scripts/security-gate.ts',
+  'scripts/sdd-gate.ts',
+  'scripts/skill-router.ts',
+  'scripts/update-guard.ts',
 ]) {
   check(`${dir} existe`, existsSync(join(repoRoot, dir)))
 }

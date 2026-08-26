@@ -204,13 +204,18 @@ implementa / verifica es estructural, no disciplinaria:
 
 | Comando | Qué hace |
 |---|---|
-| `bash scripts/install.sh` | Instalación idempotente del perfil, política y presets |
+| `bash scripts/install.sh` | Instalación idempotente del perfil, política y presets (preserva dependencias opcionales ya instaladas) |
 | `bash scripts/install.sh --with-engram` | Ídem + overlay de memoria Engram |
-| `bash scripts/dream-doctor.sh` | Salud de la instalación en 7 chequeos |
-| `pnpm verify` | Compatibilidad contra DSH pineado + validación de presets |
+| `bash scripts/install.sh --with-hooks` | Ídem + hook pre-commit anti-secretos (`security-gate stage-check`) |
+| `bash scripts/dream-doctor.sh` | Salud de la instalación en 12 chequeos (incluye postura de seguridad y vanguardia) |
+| `pnpm verify` | Compatibilidad contra DSH pineado + validación de presets + contratos |
 | `pnpm typecheck` | `tsgo --noEmit` sobre todo el tooling |
-| `node scripts/red-green.ts` | Captura observable del ciclo RED→GREEN (exit 0 = ciclo válido) |
-| `node scripts/evidence-ledger.ts` | Receipt de misión derivado de Git con SHA256 de cierre |
+| `node scripts/red-green.ts` | Ciclo TDD completo RED→GREEN→TRIANGULATE→REFACTOR con evidencia |
+| `node scripts/evidence-ledger.ts` | Receipt de misión derivado de Git; `--sdd <misión>` exige el gate SDD |
+| `node scripts/security-gate.ts` | Gate P0–P5: bloquea P5 y rutas sensibles; bypass auditable |
+| `node scripts/sdd-gate.ts` | Orden de etapas SDD exigido en runtime (contratos machine-readable) |
+| `node scripts/skill-router.ts` | Presupuesto de skills: top-3 por relevancia, resto diferido |
+| `node scripts/update-guard.ts` | Vanguardia: pin local vs última release upstream (cache offline) |
 
 ## Evidencia y receipts
 
@@ -218,7 +223,7 @@ La regla central: **ninguna afirmación de "hecho", "funciona" o "roto" sin
 evidencia observable** — salida de test, `git diff`, exit code. "Debería
 funcionar" es hipótesis, no resultado.
 
-- `red-green.ts` observa el ciclo RED→GREEN y deja registro en
+- `red-green.ts` observa el ciclo TDD completo y deja registro en
   `<repo>/.evidence/`; un test que nunca se vio rojo no prueba el fix.
 - `evidence-ledger.ts` deriva el recibo del estado real de Git (SHAs, scope,
   checks) y lo cierra con SHA256: el relato del agente no participa.
@@ -240,13 +245,28 @@ Fases implementadas:
 
 - **M0–M3** baseline · identidad/política · skills/presets · routing de workflows.
 - **M4** memoria: gate + overlay Engram opcional.
-- **M5** TDD con evidencia RED→GREEN observable.
+- **M5** TDD con evidencia observable del ciclo completo (RED→GREEN→TRIANGULATE→REFACTOR).
 - **M6** revisión 4R con contexto fresco (presets reviewer/security).
-- **M7** evidence ledger con SHA256 derivado de Git.
+- **M7** evidence ledger con SHA256 derivado de Git (+ gate SDD opcional vía `--sdd`).
 - **M8** context governor: presupuestos (política §7) + gate mecánico `scripts/context-governor.ts` con eventos `context:ok|warning|critical` y contratos por etapa en `contracts/` verificados contra los workflows.
 - **M9** model routing explícito (política §8 + skill `model-router`), con routing por transporte y **providers externos codex/claude-code operativos** (`bash scripts/install.sh --with-external-subagents`; delegación cross-engine verificada end-to-end vía codex).
-- **M10** observabilidad: `dream-doctor.sh` (9 secciones) + `dream-metrics.ts` (métricas de proceso desde recibos) + registros en `.evidence/`.
+- **M10** observabilidad: `dream-doctor.sh` (12 secciones) + `dream-metrics.ts` (tokens/task aprox, rework % derivado de Git, ciclos COMPLETE) + registros en `.evidence/`.
 - **M11** autonomía acotada: goals persistidos + jobs con límites duros (§9).
+
+Enforcement mecánico (misión "10/10"):
+
+- **security-gate**: la jerarquía P0–P5 (§3–§4) tiene dientes — deny-list P5,
+  rutas sensibles bloqueadas, hook pre-commit y escape auditable vía
+  `DC_SECURITY_BYPASS`.
+- **sdd-gate**: saltarse una etapa del workflow elegido falla mecánicamente
+  (`advance` valida orden contra `contracts/*.json`); `evidence-ledger --sdd`
+  niega el receipt a misiones incompletas.
+- **skill-router**: el presupuesto "máx 3 skills" (§10) es ejecutable, no
+  disciplina textual.
+- **update-guard**: estar en la vanguardia se verifica contra upstream (tags
+  de GitHub), con cache offline para CI.
+- **installer idempotente**: preserva dependencias opcionales entre corridas;
+  el doctor detecta patches huérfaos ("entry not found").
 
 Pendiente conocido:
 

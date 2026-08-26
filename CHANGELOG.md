@@ -9,6 +9,44 @@ y el versionado respeta [Semantic Versioning](https://semver.org/lang/es/).
 
 ### Added
 
+- **Enforcement mecánico de la política (misión "10/10")**:
+  - `scripts/security-gate.ts` — la jerarquía P0–P5 (§3–§4) deja de ser prosa:
+    clasifica comandos, bloquea P5 (`rm -rf`, `git reset --hard`, `git push
+    --force`, DROP/destroy/delete con estado…) y rutas sensibles (`.env*`,
+    `*.pem`, `~/.ssh`, credenciales), con escape auditable
+    (`DC_SECURITY_BYPASS="quién aprobó"` → `.evidence/security-gate-audit.jsonl`)
+    y modo `stage-check` para pre-commit. Hook instalable vía
+    `install.sh --with-hooks`. 15 tests.
+  - `scripts/sdd-gate.ts` — orden de etapas exigido en runtime contra los
+    contratos: saltarse una etapa falla (`advance` valida el siguiente id
+    esperado); estado auditable por misión en `.evidence/sdd-*.json`.
+    `evidence-ledger --sdd <misión>` niega el receipt si el SDD está
+    incompleto. 5 tests.
+  - `scripts/skill-router.ts` — presupuesto de skills ejecutable (§10): puntúa
+    relevancia tarea↔skill (nombre ×3, descripción/whenToUse ×2, bonus por
+    nombre completo) y emite top-N (default 3) + diferidas. Implementado con
+    ciclo TDD COMPLETE real registrado en `.evidence/`. 4 tests.
+  - `red-green.ts` v2 — fases TRIANGULATE y REFACTOR del ciclo completo, con
+    puntero `.evidence/red-green.latest.json` y marca `complete`.
+  - `scripts/update-guard.ts` — verificación de vanguardia: pin local vs último
+    tag upstream de GitHub; cache offline en `.evidence/upstream-cache.json`
+    para CI; `--strict` para gates.
+  - `dream-metrics.ts` v2 — tokens/task aproximado, rework % derivado de Git
+    (commits fix/revert sobre últimos 100) y conteo de ciclos COMPLETE.
+  - `dream-doctor.sh` v2 — 12 secciones: postura de seguridad mecánica (gate,
+    hook, permission mode), gates SDD/skill-router, vanguardia offline, y
+    detección de patches huérfaos ("entry not found") tras cambios upstream.
+- **Installer idempotente en dependencias**: `install.sh` ya no sobreescribe
+  ciegamente el manifiesto del perfil — preserva dependencias opcionales de
+  corridas previas (subagentes externos) que los overrides del patch esperan.
+
+### Fixed
+
+- Detección de providers externos en el doctor: la composición renderiza las
+  filas como `id: subagent-<provider>`, no `providerName:`.
+
+### Added (previo)
+
 - **Providers externos de subagente operativos** (codex / claude-code): core
   actualizado a la línea 0.1.1-rc.x, `scripts/install.sh --with-external-subagents`
   instala los paquetes pineados a `@next` y fusiona el overlay

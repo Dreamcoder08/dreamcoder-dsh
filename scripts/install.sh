@@ -7,6 +7,7 @@
 # Uso:
 #   bash scripts/install.sh                  # perfil + política + presets
 #   bash scripts/install.sh --with-engram    # además habilita el overlay MCP Engram
+#   bash scripts/install.sh --with-hooks     # además instala el hook pre-commit de seguridad
 #
 # Orden deliberado: `dsh plugin` debe ver el perfil SIN package.json en el
 # primer arranque para ejecutar initProfile, que escribe las piezas que un
@@ -26,10 +27,12 @@ PRESETS_DIR="$DSH_HOME/.agent-presets"
 
 WITH_ENGRAM=false
 WITH_EXTERNAL_SUBAGENTS=false
+WITH_HOOKS=false
 for arg in "$@"; do
   case "$arg" in
     --with-engram) WITH_ENGRAM=true ;;
     --with-external-subagents) WITH_EXTERNAL_SUBAGENTS=true ;;
+    --with-hooks) WITH_HOOKS=true ;;
     *) echo "Argumento desconocido: $arg" >&2; exit 2 ;;
   esac
 done
@@ -58,12 +61,38 @@ fi
 # primero, así que base y web-app no necesitan ser dependencias). El spec
 # `link:` es una PLANTILLA con @BUNDLE_DIR@: se resuelve a la ruta real de
 # esta máquina para que el repo no contenga rutas absolutas.
-sed "s|link:@BUNDLE_DIR@|link:$BUNDLE_DIR|" \
-  "$REPO_ROOT/profiles/engineering/package.json" > "$PROFILE_DIR/package.json"
+#
+# FUSIÓN IDEMPOTENTE: si el manifiesto instalado tiene dependencias propias
+# (p. ej. los subagentes externos añadidos por --with-external-subagents en
+# una corrida previa), se PRESERVAN; sobreescribir ciegamente las borraría y
+# dejaría los overrides del patch apuntando a paquetes ausentes.
+node --input-type=module -e '
+import { readFileSync, writeFileSync } from "node:fs";
+const [tmplPath, curPath, outPath, bundleDir] = process.argv.slice(1);
+const tmpl = JSON.parse(readFileSync(tmplPath, "utf8"));
+let preserved = {};
+try {
+  const cur = JSON.parse(readFileSync(curPath, "utf8"));
+  const known = new Set(Object.keys(tmpl.dependencies ?? {}));
+  for (const [name, spec] of Object.entries(cur.dependencies ?? {})) {
+    if (!known.has(name)) preserved[name] = spec;
+  }
+} catch { /* manifiesto previo ausente o corrupto: nada que preservar */ }
+const merged = {
+  ...tmpl,
+  dependencies: { ...(tmpl.dependencies ?? {}), ...preserved },
+};
+merged.dependencies = Object.fromEntries(
+  Object.entries(merged.dependencies).map(([n, s]) =>
+    [n, typeof s === "string" ? s.replace("link:@BUNDLE_DIR@", bundleDir) : s]),
+);
+writeFileSync(outPath, JSON.stringify(merged, null, 2) + "\n");
+const kept = Object.keys(preserved);
+if (kept.length > 0) console.log(`==> Dependencias opcionales preservadas: ${kept.join(", ")}`);
+' "$REPO_ROOT/profiles/engineering/package.json" "$PROFILE_DIR/package.json" "$PROFILE_DIR/package.json" "$BUNDLE_DIR"
 
 echo "==> Sincronizando instalación del perfil…"
 dsh plugin --profile "$PROFILE_NAME" install
-
 # ── 1b. Subagentes externos (opcional, --with-external-subagents) ───────────
 # Camino de instalación documentado por los propios paquetes upstream:
 # `dsh plugin --profile <name> add <pkg>`. Los providers no arrancan proceso
@@ -184,6 +213,29 @@ if $WITH_EXTERNAL_SUBAGENTS && ! grep -q "subagent-codex" "$PROFILE_PATCH" 2>/de
     echo "  Fusiona manualmente memory/subagents-external.cordis.yml." >&2
     exit 1
   fi
+fi
+
+# ── 5. Hook pre-commit de seguridad (opcional, --with-hooks) ─────────────────
+# Enforcement mecánico de policy/AGENTS.md §4: bloquea commits con rutas
+# sensibles o claves privadas en el diff staged, vía scripts/security-gate.ts.
+if $WITH_HOOKS; then
+  HOOK="$REPO_ROOT/.git/hooks/pre-commit"
+  HOOK_BODY="#!/usr/bin/env bash
+# Generado por scripts/install.sh --with-hooks (policy/AGENTS.md §4).
+exec node \"\$(git rev-parse --show-toplevel)/scripts/security-gate.ts\" stage-check
+"
+  printf '%s' "$HOOK_BODY" > "$HOOK" && chmod +x "$HOOK"
+  echo "==> hook pre-commit instalado ($HOOK)"
+fi
+
+# ── 6. Manifiesto de procedencia (SHA-256) ───────────────────────────────────
+# Registra el hash de los artefactos copiados/generados en $DSH_HOME para que
+# dream-doctor.sh (sección 13) detecte drift posterior a la instalación.
+MANIFEST_SCRIPT="$REPO_ROOT/scripts/dream-manifest.sh"
+if [ -f "$MANIFEST_SCRIPT" ]; then
+  bash "$MANIFEST_SCRIPT" generate "$DSH_HOME" "$REPO_ROOT" "$PROFILE_NAME"
+else
+  echo "AVISO: falta scripts/dream-manifest.sh; sin manifiesto de procedencia" >&2
 fi
 
 echo "==> Instalación completa. Verifica con: pnpm verify (desde $REPO_ROOT)"
