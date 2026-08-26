@@ -1,12 +1,13 @@
-# Overlay de memoria longitudinal (Engram) para el perfil `engineering`.
+# Overlay de memoria longitudinal (Engram) — CAPA GLOBAL del usuario.
 #
-# Añade el servidor MCP de Engram como fila insertada en la composición del
-# host, exponiendo las tools `mcp__engram__*` a los agentes del perfil.
+# Añade el servidor MCP de Engram como fila insertada en $DSH_HOME/
+# cordis.patch.yml, de modo que TODOS los perfiles (web, engineering,
+# headless, dsh-tui…) expongan las tools `mcp__engram__*`. No insertar esta
+# fila además en un patch de perfil: DSH rechaza ids duplicados entre capas
+# ("duplicate loader entry id") y el perfil no arranca.
 #
 # Uso:
-#   bash scripts/install.sh --with-engram      # instala y habilita el overlay
-#   dsh web --profile engineering \
-#       --patch <ruta-de-este-repo>/memory/engram.cordis.yml   # one-shot
+#   bash scripts/install.sh --with-engram      # instala/migra a la capa global
 #
 # Requisito: binario `engram` pineado (v1.20.0) en PATH.
 #   go install github.com/Gentleman-Programming/engram/cmd/engram@v1.20.0

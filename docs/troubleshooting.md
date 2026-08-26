@@ -28,7 +28,7 @@ resumen final es literal:
 | 3 | Política global | `~/.dsh/AGENTS.md` existe e idéntico a `policy/AGENTS.md` | Reinstalar; `install.sh` respalda el archivo previo |
 | 4 | Presets de agentes | Cada rol bajo `agents/` tiene su `agent.cordis.yml` y está enlazado en `$DSH_HOME/.agent-presets/` | `bash scripts/install.sh` (idempotente) |
 | 5 | Skills del bundle | Las siete skills existen en `bundles/engineering/skills/` y están enlazadas en `$DSH_HOME/skills/` | Reinstalar; ver caso más abajo |
-| 6 | Memoria longitudinal (opcional) | Binario `engram` disponible y overlay Engram habilitado en el patch del perfil | Informativo: es opcional (`install.sh --with-engram`) |
+| 6 | Memoria longitudinal (opcional) | Binario `engram` disponible y overlay Engram habilitado en la capa global (`$DSH_HOME/cordis.patch.yml`; el formato viejo solo-perfil se detecta con aviso de migración) | Informativo: es opcional (`install.sh --with-engram`) |
 | 7 | Evidencia reciente | Registros bajo `.evidence/` del repo actual | Informativo |
 | 8 | Proveedores de subagente | Providers core `spawn` y `fork` compuestos; externos codex / claude-code detectados (opcionales); CLIs presentes | Patch huérfano: reinstalar los paquetes (`install.sh --with-external-subagents`) |
 | 9 | Contratos SDD | `contracts/` + schema presentes, `scripts/context-governor.ts`, Node ≥26 y `verify-contracts` en verde | Actualizar Node o corregir contratos según la línea ✘ |
@@ -146,6 +146,27 @@ overlay; sin él, aborta en vez de dejar una capa de patch rota.
 **Remedio.** Instalá `engram` v1.20.0 primero, o ejecutá `install.sh` sin el
 flag: el overlay es opcional y la sesión opera sin memoria longitudinal
 declarándolo una vez — jamás se simula memoria que no existe.
+
+### El perfil no arranca con "duplicate loader entry id: memory-engram"
+
+**Síntoma** (literal del arranque de DSH):
+
+```
+Error: dsh: plugin tree failed to load: failed to apply loader entry include
+(cordis:include): duplicate loader entry id: memory-engram
+```
+
+**Causa.** La fila `memory-engram` está insertada DOS veces en capas distintas
+(típicamente: copia vieja en el patch del perfil + copia nueva en la capa
+global `$DSH_HOME/cordis.patch.yml`). El loader de Cordis rechaza ids
+duplicados entre capas; desde la capa global existe, ningún patch de perfil
+debe repetirla.
+
+**Remedio.** Re-ejecutá `bash scripts/install.sh --with-engram`: la sección 4
+detecta la duplicación y migra automáticamente (retira la fila del patch del
+perfil con backup y valida la composición). Si preferís hacerlo a mano,
+borrá el bloque `- insert:` con `id: memory-engram` del patch del perfil y
+dejalo solo en la capa global.
 
 ### Una skill no aparece en la sesión
 

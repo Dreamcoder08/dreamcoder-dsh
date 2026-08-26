@@ -123,7 +123,7 @@ git clone <este-repo> dreamcoder-dsh && cd dreamcoder-dsh
 pnpm install                            # dependencias de desarrollo (tsgo, @types/node)
 
 bash scripts/install.sh                 # instala perfil, política y presets (idempotente)
-bash scripts/install.sh --with-engram   # además habilita memoria Engram (requiere binario)
+bash scripts/install.sh --with-engram   # además habilita memoria Engram en la capa global (requiere binario)
 bash scripts/install.sh --with-hooks    # además hook pre-commit anti-secretos + pre-push
 ```
 
@@ -134,7 +134,9 @@ Qué hace el instalador:
    versión previa como `AGENTS.md.backup.<timestamp>`.
 3. Publica los seis agent presets en `$DSH_HOME/.agent-presets`.
 4. Enlaza las 7 skills en `$DSH_HOME/skills`.
-5. Con `--with-engram`, registra el overlay MCP `memory/engram.cordis.yml`.
+5. Con `--with-engram`, registra el overlay MCP `memory/engram.cordis.yml` en la
+   **capa global** (`$DSH_HOME/cordis.patch.yml`): una sola fila para todos los
+   perfiles; migra instalaciones viejas que la tuvieran en el patch del perfil.
 
 `DSH_HOME` respeta su valor de entorno (default: `~/.dsh`); la instalación es
 idempotente y puede re-ejecutarse sin efectos residuales.
@@ -261,7 +263,7 @@ implementa / verifica es estructural, no disciplinaria:
 | Comando | Qué hace |
 |---|---|
 | `bash scripts/install.sh` | Instalación idempotente del perfil, política y presets (preserva dependencias opcionales ya instaladas) |
-| `bash scripts/install.sh --with-engram` | Ídem + overlay de memoria Engram |
+| `bash scripts/install.sh --with-engram` | Ídem + overlay de memoria Engram en la capa global (todos los perfiles; auto-migra formato viejo) |
 | `bash scripts/install.sh --with-hooks` | Ídem + hook pre-commit anti-secretos y hook pre-push (suite completa antes de publicar) |
 | `/dream-doctor` · `/dream-status` | Comandos in-session de la GUI (tras reiniciar dsh): corren doctor y métricas sin salir de la sesión |
 | `bash scripts/dream-doctor.sh` | Salud de la instalación en 13 chequeos (seguridad, vanguardia y procedencia SHA-256) |

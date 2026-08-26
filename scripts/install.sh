@@ -153,34 +153,88 @@ for skill_dir in "$REPO_ROOT"/bundles/engineering/skills/*/; do
 done
 
 # ── 4. Overlay de memoria longitudinal (opcional, --with-engram) ─────────────
-# La capa de patch del perfil es UN documento YAML (lista de filas). El overlay
-# se fusiona así:
-#   - archivo vacío o `[]` → se reemplaza por la plantilla completa;
-#   - ya contiene memory-engram → no-op (idempotente);
-#   - contiene otras filas → fusión textual solo si el documento termina de
-#     forma que un append sea válido; si no, falla ruidoso pidiendo merge
-#     manual (jamás dejar una capa de patch rota en silencio).
+# La fila `memory-engram` vive en la CAPA GLOBAL del usuario
+# ($DSH_HOME/cordis.patch.yml), no en el patch del perfil: una sola fuente
+# para TODOS los perfiles (web, engineering, headless, dsh-tui…). DSH no
+# tolera dos inserts con el mismo id en capas distintas — "duplicate loader
+# entry id: memory-engram" rompe el arranque del perfil — así que esta sección
+# además AUTO-REPARA instalaciones viejas que todavía la tengan en el patch
+# del perfil: la retira de ahí (con backup) una vez garantizado que la capa
+# global la tiene. Toda mutación se valida componiendo el perfil; si rompe,
+# rollback desde backup.
+GLOBAL_PATCH="$DSH_HOME/cordis.patch.yml"
 PROFILE_PATCH="$PROFILE_DIR/cordis.patch.yml"
-OVERLAY_BODY="# ── Memoria longitudinal (Engram vía MCP) — gestionado por install.sh ──
+ENGRAM_BLOCK="# ── Memoria longitudinal (Engram vía MCP) — capa global, gestionado por install.sh ──
 $(cat "$REPO_ROOT/memory/engram.cordis.yml")
 "
 if $WITH_ENGRAM; then
   command -v engram >/dev/null 2>&1 \
     || { echo "ERROR: --with-engram requiere el binario 'engram' en PATH (pin v1.20.0)" >&2; exit 1; }
-  if [ ! -f "$PROFILE_PATCH" ]; then
-    printf '%s\n' "$OVERLAY_BODY" > "$PROFILE_PATCH"
-    echo "==> $PROFILE_PATCH creado con el overlay Engram"
-  elif grep -q "memory-engram" "$PROFILE_PATCH"; then
-    echo "==> Overlay Engram ya habilitado en $PROFILE_PATCH"
-  elif grep -Eq '^[[:space:]]*\[[[:space:]]*\][[:space:]]*$' "$PROFILE_PATCH" \
-       && [ "$(grep -cv '^[[:space:]]*\(#.*\)\?[[:space:]]*$' "$PROFILE_PATCH")" -le 1 ]; then
-    printf '%s\n' "$OVERLAY_BODY" > "$PROFILE_PATCH"
-    echo "==> Capa vacía reemplazada: overlay Engram instalado en $PROFILE_PATCH"
+
+  # 4.a Garantizar la fila en la capa global (idempotente). Detección ESTRICTA:
+  # solo cuenta la fila real (`- id: memory-engram`), no menciones en comentarios.
+  if [ -f "$GLOBAL_PATCH" ] && grep -Eq '^[[:space:]]*-[[:space:]]+id:[[:space:]]*memory-engram([[:space:]]|$)' "$GLOBAL_PATCH"; then
+    echo "==> Overlay Engram ya presente en la capa global ($GLOBAL_PATCH)"
+  elif [ ! -f "$GLOBAL_PATCH" ]; then
+    printf '%s\n' "$ENGRAM_BLOCK" > "$GLOBAL_PATCH"
+    echo "==> $GLOBAL_PATCH creado con el overlay Engram (aplica a todos los perfiles)"
+  elif grep -Eq '^[[:space:]]*\[[[:space:]]*\][[:space:]]*$' "$GLOBAL_PATCH" \
+       && [ "$(grep -cv '^[[:space:]]*\(#.*\)\?[[:space:]]*$' "$GLOBAL_PATCH")" -le 1 ]; then
+    printf '%s\n' "$ENGRAM_BLOCK" > "$GLOBAL_PATCH"
+    echo "==> Capa global vacía reemplazada: overlay Engram instalado"
   else
-    echo "ERROR: $PROFILE_PATCH tiene contenido propio y no puedo fusionarlo sin riesgo." >&2
-    echo "  Añade manualmente el bloque de $REPO_ROOT/memory/engram.cordis.yml" >&2
-    echo "  dentro de la lista YAML (mismo documento, sin separador ---)." >&2
-    exit 1
+    # La capa global tiene filas propias: APPEND con backup y validación.
+    BACKUP="$GLOBAL_PATCH.backup.$(date +%Y%m%d-%H%M%S)"
+    cp "$GLOBAL_PATCH" "$BACKUP"
+    printf '\n%s\n' "$ENGRAM_BLOCK" >> "$GLOBAL_PATCH"
+    if dsh --profile "$PROFILE_NAME" --dump-config >/dev/null 2>&1; then
+      echo "==> Overlay Engram añadido a la capa global $GLOBAL_PATCH (composición validada)"
+    else
+      mv "$BACKUP" "$GLOBAL_PATCH"
+      echo "ERROR: el append rompió la composición; capa global restaurada desde $BACKUP." >&2
+      exit 1
+    fi
+  fi
+
+  # 4.b Auto-reparación: retirar la fila del patch del perfil si aún vive ahí
+  # (duplicaría el id contra la capa global y rompería el arranque). Detección
+  # estricta de la fila real; menciones en comentarios no cuentan.
+  if grep -Eq '^[[:space:]]*-[[:space:]]+id:[[:space:]]*memory-engram([[:space:]]|$)' "$PROFILE_PATCH" 2>/dev/null; then
+    BACKUP="$PROFILE_PATCH.backup.$(date +%Y%m%d-%H%M%S)"
+    cp "$PROFILE_PATCH" "$BACKUP"
+    if node --input-type=module -e '
+import { readFileSync, writeFileSync } from "node:fs";
+const [path] = process.argv.slice(1);
+const lines = readFileSync(path, "utf8").split("\n");
+const idIdx = lines.findIndex((l) => /^\s*- id: memory-engram\s*$/.test(l));
+if (idIdx === -1) process.exit(0);
+// Subir desde la fila hasta "- insert:" pasando por líneas indentadas
+// (config del insert) y comentarios contiguos que encabezan el bloque.
+let start = idIdx;
+while (start > 0 && (/^\s/.test(lines[start - 1]) || /^#/.test(lines[start - 1]))) start--;
+if (start > 0 && /^- insert:\s*$/.test(lines[start - 1])) {
+  start--;
+  while (start > 0 && /^#/.test(lines[start - 1])) start--;
+}
+// Bajar hasta la primera línea que ya no sea parte del bloque insert.
+let end = idIdx + 1;
+while (end < lines.length && (/^\s/.test(lines[end]) || lines[end] === "")) end++;
+lines.splice(start, end - start);
+writeFileSync(path, lines.join("\n"));
+' "$PROFILE_PATCH"; then
+      if dsh --profile "$PROFILE_NAME" --dump-config >/dev/null 2>&1 \
+         && ! grep -q "memory-engram" "$PROFILE_PATCH"; then
+        rm -f "$BACKUP"
+        echo "==> Migración completa: fila retirada de $PROFILE_PATCH (vivía duplicada)"
+      else
+        mv "$BACKUP" "$PROFILE_PATCH"
+        echo "AVISO: no pude retirar la fila del patch del perfil sin romperlo; restaurado." >&2
+        echo "  Retírala a mano de $PROFILE_PATCH: duplica el id contra la capa global." >&2
+      fi
+    else
+      mv "$BACKUP" "$PROFILE_PATCH"
+      echo "AVISO: edición del patch del perfil falló; restaurado desde $BACKUP." >&2
+    fi
   fi
 fi
 

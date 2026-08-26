@@ -76,8 +76,10 @@ if command -v engram >/dev/null 2>&1; then
 else
   info "engram no instalado — memoria longitudinal deshabilitada (opcional)"
 fi
-if grep -q "memory-engram" "$DSH_HOME/profiles/$PROFILE/cordis.patch.yml" 2>/dev/null; then
-  ok "overlay Engram habilitado en el perfil"
+if grep -Eq '^[[:space:]]*-[[:space:]]+id:[[:space:]]*memory-engram([[:space:]]|$)' "$DSH_HOME/cordis.patch.yml" 2>/dev/null; then
+  ok "overlay Engram en la capa global (todos los perfiles)"
+elif grep -Eq '^[[:space:]]*-[[:space:]]+id:[[:space:]]*memory-engram([[:space:]]|$)' "$DSH_HOME/profiles/$PROFILE/cordis.patch.yml" 2>/dev/null; then
+  info "overlay Engram en el patch del perfil (formato viejo; re-ejecuta install.sh --with-engram para migrarlo a la capa global)"
 else
   info "overlay Engram no habilitado (bash scripts/install.sh --with-engram)"
 fi
