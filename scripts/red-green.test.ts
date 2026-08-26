@@ -3,8 +3,8 @@
 // `.evidence/` state never leaks between cases.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { describe, test } from 'node:test'
-import { existsSync, mkdtempSync, readFileSync, readdirSync } from 'node:fs'
+import { after, describe, test } from 'node:test'
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -14,7 +14,16 @@ const RUNNER = process.execPath
 const PASSING = [RUNNER, '-e', 'process.exit(0)']
 const FAILING = [RUNNER, '-e', 'process.exit(3)']
 
-const newWorkspace = (): string => mkdtempSync(join(tmpdir(), 'dsh-redgreen-'))
+const tempDirs: string[] = []
+const newWorkspace = (): string => {
+  const ws = mkdtempSync(join(tmpdir(), 'dsh-redgreen-'))
+  tempDirs.push(ws)
+  return ws
+}
+// Higiene: ninguna fixture sobrevive a la suite (el TMPDIR queda limpio).
+after(() => {
+  for (const dir of tempDirs) rmSync(dir, { recursive: true, force: true })
+})
 
 const runTool = (cwd: string, phase: string, cmd: readonly string[]) =>
   spawnSync(RUNNER, [SCRIPT, phase, '--', ...cmd], { cwd, encoding: 'utf8' })

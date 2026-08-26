@@ -3,14 +3,26 @@
 // DSH session telemetry (token usage per step).
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { describe, test } from 'node:test'
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { after, describe, test } from 'node:test'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const SCRIPT = join(import.meta.dirname, 'dream-metrics.ts')
 const RUNNER = process.execPath
 const HAS_ZSTD = spawnSync('zstd', ['--version']).status === 0
+
+const tempDirs: string[] = []
+/** mkdtemp rastreado: toda fixture se elimina en el after final. */
+const newTemp = (prefix: string): string => {
+  const dir = mkdtempSync(join(tmpdir(), prefix))
+  tempDirs.push(dir)
+  return dir
+}
+// Higiene: ninguna fixture sobrevive a la suite (el TMPDIR queda limpio).
+after(() => {
+  for (const dir of tempDirs) rmSync(dir, { recursive: true, force: true })
+})
 
 interface UsageStep {
   inputTokens: number
@@ -58,7 +70,7 @@ const missionYaml = (mission: string, verdict: 'PASS' | 'FAIL', recordedAt = '20
 
 describe('dream-metrics.ts', () => {
   test('reports zeros on an empty evidence directory', () => {
-    const ws = mkdtempSync(join(tmpdir(), 'dsh-metrics-'))
+    const ws = newTemp('dsh-metrics-')
     mkdirSync(join(ws, '.evidence'))
     const r = runMetrics(ws)
     assert.equal(r.status, 0)
@@ -70,7 +82,7 @@ describe('dream-metrics.ts', () => {
   })
 
   test('counts missions by verdict and TDD cycles from real receipt shapes', () => {
-    const ws = mkdtempSync(join(tmpdir(), 'dsh-metrics-'))
+    const ws = newTemp('dsh-metrics-')
     const ev = join(ws, '.evidence')
     mkdirSync(ev)
     writeFileSync(join(ev, 'mission-alpha-1.yaml'), missionYaml('alpha', 'PASS'))
@@ -101,9 +113,9 @@ describe('dream-metrics.ts', () => {
   })
 
   test('honors an explicit --evidence-dir instead of <cwd>/.evidence', () => {
-    const ws = mkdtempSync(join(tmpdir(), 'dsh-metrics-'))
+    const ws = newTemp('dsh-metrics-')
     mkdirSync(join(ws, '.evidence')) // stays empty on purpose
-    const elsewhere = mkdtempSync(join(tmpdir(), 'dsh-metrics-ev-'))
+    const elsewhere = newTemp('dsh-metrics-ev-')
     writeFileSync(join(elsewhere, 'mission-gamma-3.yaml'), missionYaml('gamma', 'PASS'))
     const r = runMetrics(ws, ['--evidence-dir', elsewhere])
     assert.equal(r.status, 0)
@@ -114,7 +126,7 @@ describe('dream-metrics.ts', () => {
   })
 
   test('aggregates token usage from DSH session telemetry', { skip: !HAS_ZSTD }, () => {
-    const ws = mkdtempSync(join(tmpdir(), 'dsh-metrics-'))
+    const ws = newTemp('dsh-metrics-')
     mkdirSync(join(ws, '.evidence'))
     const firstOk = writeSession(ws, 'aaaa', [
       { inputTokens: 100, outputTokens: 10 },
@@ -132,7 +144,7 @@ describe('dream-metrics.ts', () => {
   })
 
   test('aggregates native token-meter projections from the projcache', () => {
-    const ws = mkdtempSync(join(tmpdir(), 'dsh-metrics-'))
+    const ws = newTemp('dsh-metrics-')
     mkdirSync(join(ws, '.evidence'))
     const projcache = join(ws, 'session_projcache.json')
     const totals = (uncached: number, out: number, cr: number, cw: number) => ({
@@ -179,7 +191,7 @@ describe('dream-metrics.ts', () => {
   })
 
   test('degrades to null peaks when the projcache is missing or corrupt', () => {
-    const ws = mkdtempSync(join(tmpdir(), 'dsh-metrics-'))
+    const ws = newTemp('dsh-metrics-')
     mkdirSync(join(ws, '.evidence'))
     const r = runMetrics(ws) // sin --projcache y sin ~/.dsh real que matchee: nulls o ceros
     assert.equal(r.status, 0)

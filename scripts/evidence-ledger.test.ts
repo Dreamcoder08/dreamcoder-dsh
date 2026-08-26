@@ -3,8 +3,8 @@
 // receipts are computed against real diffs and real check commands.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { describe, test } from 'node:test'
-import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { after, describe, test } from 'node:test'
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -19,9 +19,16 @@ interface Repo {
 const git = (cwd: string, args: string[]) =>
   spawnSync('git', args, { cwd, encoding: 'utf8' })
 
+const tempDirs: string[] = []
+// Higiene: ninguna fixture sobrevive a la suite (el TMPDIR queda limpio).
+after(() => {
+  for (const dir of tempDirs) rmSync(dir, { recursive: true, force: true })
+})
+
 /** Creates a temp repo with one committed file; returns it plus the base SHA. */
 const initRepo = (): Repo => {
   const dir = mkdtempSync(join(tmpdir(), 'dsh-ledger-'))
+  tempDirs.push(dir)
   git(dir, ['init', '-q'])
   git(dir, ['config', 'user.email', 'test@local'])
   git(dir, ['config', 'user.name', 'test'])

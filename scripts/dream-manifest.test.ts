@@ -3,12 +3,18 @@
 // a fake DSH_HOME; no dsh/pnpm needed.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { describe, test } from 'node:test'
-import { mkdirSync, mkdtempSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
+import { after, describe, test } from 'node:test'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const SCRIPT = join(import.meta.dirname, 'dream-manifest.sh')
+
+const tempDirs: string[] = []
+// Higiene: ninguna fixture sobrevive a la suite (el TMPDIR queda limpio).
+after(() => {
+  for (const dir of tempDirs) rmSync(dir, { recursive: true, force: true })
+})
 
 interface Fixture {
   dshHome: string
@@ -18,6 +24,7 @@ interface Fixture {
 /** Fake installation: AGENTS.md copy + generated profile package.json. */
 const makeFixture = (): Fixture => {
   const root = mkdtempSync(join(tmpdir(), 'dsh-manifest-'))
+  tempDirs.push(root)
   const dshHome = join(root, 'dsh-home')
   const repoRoot = join(root, 'repo')
   mkdirSync(join(dshHome, 'profiles', 'engineering'), { recursive: true })

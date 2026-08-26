@@ -2,15 +2,24 @@
 // Runs the real script against a temp specs dir; contracts come from the repo.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { describe, test } from 'node:test'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { after, describe, test } from 'node:test'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const SCRIPT = join(import.meta.dirname, 'sdd-specs.ts')
 const CONTRACTS = join(import.meta.dirname, '..', 'contracts')
 
-const makeWs = (): string => mkdtempSync(join(tmpdir(), 'dsh-specs-'))
+const tempDirs: string[] = []
+const makeWs = (): string => {
+  const ws = mkdtempSync(join(tmpdir(), 'dsh-specs-'))
+  tempDirs.push(ws)
+  return ws
+}
+// Higiene: ninguna fixture sobrevive a la suite (el TMPDIR queda limpio).
+after(() => {
+  for (const dir of tempDirs) rmSync(dir, { recursive: true, force: true })
+})
 
 const run = (ws: string, args: string[]) =>
   spawnSync(process.execPath, [SCRIPT, ...args, '--specs-dir', ws], { cwd: ws, encoding: 'utf8' })

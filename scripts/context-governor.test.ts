@@ -3,8 +3,8 @@
 // (plain session.jsonl — no zstd needed) in an isolated temp dir.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { describe, test } from 'node:test'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
+import { after, describe, test } from 'node:test'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -28,7 +28,24 @@ const newSession = (root: string, name: string, inputs: number[]): string => {
   return name
 }
 
-const newRoot = (): string => mkdtempSync(join(tmpdir(), 'dsh-governor-'))
+const tempDirs: string[] = []
+const newRoot = (): string => {
+  const root = mkdtempSync(join(tmpdir(), 'dsh-governor-'))
+  tempDirs.push(root)
+  return root
+}
+// Higiene: ninguna fixture sobrevive a la suite (el TMPDIR queda limpio).
+// Los .out que el propio CLI del governor graba en TMPDIR al registrar eventos
+// también se retiran — SOLO los creados por esta corrida (snapshot previo),
+// jamás los de una sesión DSH viva que comparta el TMPDIR.
+const GOV_OUT = /^dsh-governor-\d+-\d+\.out$/
+const preExistingOuts = new Set(readdirSync(tmpdir()).filter((f) => GOV_OUT.test(f)))
+after(() => {
+  for (const dir of tempDirs) rmSync(dir, { recursive: true, force: true })
+  for (const f of readdirSync(tmpdir())) {
+    if (GOV_OUT.test(f) && !preExistingOuts.has(f)) rmSync(join(tmpdir(), f), { force: true })
+  }
+})
 
 /** El camino feliz zstd requiere el binario; si falta, el test se salta. */
 const HAS_ZSTD = spawnSync('zstd', ['--version'], { encoding: 'utf8' }).status === 0

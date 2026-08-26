@@ -3,8 +3,8 @@
 // repo's own contracts are exercised exactly like third-party ones would be.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { describe, test } from 'node:test'
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { after, describe, test } from 'node:test'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -14,7 +14,16 @@ const REPO_ROOT = join(import.meta.dirname, '..')
 const REPO_CONTRACTS = join(REPO_ROOT, 'contracts')
 const REPO_SCHEMA = join(REPO_ROOT, 'schemas', 'stage-contract.schema.json')
 
-const newDir = (): string => mkdtempSync(join(tmpdir(), 'dsh-contracts-'))
+const tempDirs: string[] = []
+const newDir = (): string => {
+  const dir = mkdtempSync(join(tmpdir(), 'dsh-contracts-'))
+  tempDirs.push(dir)
+  return dir
+}
+// Higiene: ninguna fixture sobrevive a la suite (el TMPDIR queda limpio).
+after(() => {
+  for (const dir of tempDirs) rmSync(dir, { recursive: true, force: true })
+})
 
 const run = (contractsDir: string) =>
   spawnSync(RUNNER, [SCRIPT, '--contracts-dir', contractsDir], { encoding: 'utf8' })
