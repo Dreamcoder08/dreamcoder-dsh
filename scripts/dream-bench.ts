@@ -130,7 +130,29 @@ function writeReceipt(results: JourneyResult[], completed: number, failed: numbe
   writeFileSync(stamp, JSON.stringify(receipt, null, 2))
 }
 
-function main(): number {
+function main(argv: readonly string[]): number {
+  // --only <id,id,…>: subconjunto de journeys para entornos sin dependencias
+  // de host (p. ej. CI corre j1-j3; j4-j6 necesitan dsh/DSH_HOME real).
+  let only: Set<string> | null = null
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === '--only') {
+      const raw = argv[++i] ?? ''
+      only = new Set(
+        raw
+          .split(',')
+          .map((s) => s.trim())
+          .filter((s) => s !== ''),
+      )
+      if (only.size === 0) {
+        console.error('Argumento inválido: --only requiere ids separados por coma')
+        return 4
+      }
+    } else {
+      console.error(`Argumento desconocido: ${String(argv[i])}`)
+      return 4
+    }
+  }
+
   const declarationErrors = validateCorpus(journeys)
   if (declarationErrors.length > 0) {
     console.error('✘ corpus inválido (declaraciones):')
@@ -138,8 +160,14 @@ function main(): number {
     return 2
   }
 
+  const selected = only === null ? journeys : journeys.filter((j) => only.has(j.id))
+  if (selected.length === 0) {
+    console.error(`✘ --only no coincide con ningún journey del corpus (${journeys.map((j) => j.id).join(', ')})`)
+    return 4
+  }
+
   const results: JourneyResult[] = []
-  for (const j of journeys) {
+  for (const j of selected) {
     const r = runJourney(j)
     results.push(r)
     const mark = r.status === 'completed' ? '✔' : '✘'
@@ -148,8 +176,12 @@ function main(): number {
 
   const completed = results.filter((r) => r.status === 'completed').length
   const failed = results.length - completed
+  const skipped = journeys.length - results.length
   console.log('')
-  console.log(`bench driven: ${completed} completado(s) / ${failed} fallido(s) / 0 omitido(s) — corpus ${journeys.length} journey(s)`)
+  console.log(
+    `bench driven: ${completed} completado(s) / ${failed} fallido(s) / ${skipped} omitido(s) — corpus ${journeys.length} journey(s)` +
+      (skipped > 0 ? ` (corrida parcial: ${results.map((r) => r.id).join(',')})` : ''),
+  )
   writeReceipt(results, completed, failed)
   return failed === 0 ? 0 : 1
 }
@@ -163,4 +195,4 @@ const invokedFile = (() => {
   }
 })()
 
-if (invokedFile === thisFile) process.exit(main())
+if (invokedFile === thisFile) process.exit(main(process.argv.slice(2)))
