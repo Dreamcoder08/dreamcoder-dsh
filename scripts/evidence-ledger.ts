@@ -12,6 +12,7 @@
 //     --mission feat-auth-refresh \
 //     --base 82ac31 \
 //     [--expected 9] \
+//     [--sdd feat-auth-refresh] \
 //     --check "unit tests" -- "pnpm test" \
 //     [--check "lint" -- "pnpm lint"] ...
 //
@@ -22,7 +23,7 @@
 
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 type YamlScalar = string | number | boolean | null | undefined | YamlValue[] | { [k: string]: YamlValue }
@@ -46,6 +47,7 @@ interface CliOptions {
   base: string
   candidate?: string
   expected?: number
+  sdd?: string
   checks: CheckSpec[]
 }
 
@@ -55,6 +57,7 @@ interface PartialCliOptions {
   base?: string
   candidate?: string
   expected?: number
+  sdd?: string
   checks: CheckSpec[]
 }
 
@@ -77,13 +80,14 @@ function parseArgs(argv: readonly string[]): CliOptions {
   const isOptionBoundary = (token: string | undefined): boolean =>
     token === undefined || token === '--check' ||
     token === '--mission' || token === '--base' ||
-    token === '--candidate' || token === '--expected'
+    token === '--candidate' || token === '--expected' || token === '--sdd'
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--mission') out.mission = argv[++i] as string
     else if (a === '--base') out.base = argv[++i] as string
     else if (a === '--candidate') out.candidate = argv[++i] as string
     else if (a === '--expected') out.expected = Number(argv[++i])
+    else if (a === '--sdd') out.sdd = argv[++i] as string
     else if (a === '--check') {
       const label = argv[++i] as string
       if (argv[++i] !== '--') throw new Error('--check requiere "-- <comando>"')
@@ -130,9 +134,36 @@ const runCheck = (c: CheckSpec): CheckResult => {
 }
 const checks = opts.checks.map(runCheck)
 
+// Gate SDD opcional (--sdd <misión>): el recibo solo puede ser PASS si el
+// estado de sdd-gate.ts muestra todas las etapas del contrato completadas.
+interface SddStateFile {
+  mission: string
+  workflow: string
+  contractStages: string[]
+  stages: { id: string; completedAt: string; note: string }[]
+}
+let sddVerdict: { mission: string; workflow: string; complete: boolean; missing: string[] } | null = null
+if (opts.sdd !== undefined) {
+  const p = join(process.cwd(), '.evidence', `sdd-${opts.sdd}.json`)
+  if (!existsSync(p)) {
+    console.error(`✘ --sdd '${opts.sdd}': no existe .evidence/sdd-${opts.sdd}.json (¿corriste sdd-gate start?)`)
+    process.exit(1)
+  }
+  const state = JSON.parse(readFileSync(p, 'utf8')) as SddStateFile
+  const missing = state.contractStages.filter((id) => !state.stages.some((s) => s.id === id))
+  sddVerdict = { mission: state.mission, workflow: state.workflow, complete: missing.length === 0, missing }
+}
+
 const scopeMatch: boolean | null = opts.expected === undefined ? null : changedFiles.length === opts.expected
 
-const receipt = {
+const receipt: {
+  mission: string
+  recordedAt: string
+  repository: string
+  git: Record<string, unknown>
+  verification: { label: string; command: string; exitCode: number; passed: boolean }[]
+  sdd?: Record<string, unknown>
+} = {
   mission: opts.mission,
   recordedAt: new Date().toISOString(),
   repository: process.cwd(),
@@ -149,9 +180,18 @@ const receipt = {
   },
   verification: checks.map((c) => ({ label: c.label, command: c.command, exitCode: c.exitCode, passed: c.passed })),
 }
+if (sddVerdict !== null) {
+  receipt.sdd = {
+    mission: sddVerdict.mission,
+    workflow: sddVerdict.workflow,
+    complete: sddVerdict.complete,
+    missingStages: sddVerdict.missing,
+  }
+}
 
 const allChecksPass = checks.length > 0 && checks.every((c) => c.passed)
-const verdict: 'PASS' | 'FAIL' = ancestorOk && allChecksPass && scopeMatch !== false ? 'PASS' : 'FAIL'
+const sddOk = sddVerdict === null || sddVerdict.complete
+const verdict: 'PASS' | 'FAIL' = ancestorOk && allChecksPass && sddOk && scopeMatch !== false ? 'PASS' : 'FAIL'
 
 const dir = join(process.cwd(), '.evidence')
 mkdirSync(dir, { recursive: true })
