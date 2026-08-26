@@ -231,6 +231,25 @@ exec node \"\$(git rev-parse --show-toplevel)/scripts/security-gate.ts\" stage-c
   fi
   printf '%s' "$HOOK_BODY" > "$HOOK" && chmod +x "$HOOK"
   echo "==> hook pre-commit instalado ($HOOK)"
+
+  # Pre-push: nada sale del repo sin la suite en verde (§5: sin evidencia no
+  # está hecho). El push es P4 EXTERNAL-WRITE; este hook lo condiciona a la
+  # verificación local completa.
+  PUSH_HOOK="$REPO_ROOT/.git/hooks/pre-push"
+  PUSH_BODY="#!/usr/bin/env bash
+# Generado por scripts/install.sh --with-hooks (policy/AGENTS.md §5).
+set -e
+ROOT=\"\$(git rev-parse --show-toplevel)\"
+echo \"==> pre-push: suite completa antes de publicar…\"
+node \"\$ROOT/scripts/security-gate.ts\" stage-check
+cd \"\$ROOT\" && pnpm test
+"
+  if [ -f "$PUSH_HOOK" ] && ! grep -q "install.sh --with-hooks" "$PUSH_HOOK" 2>/dev/null; then
+    cp "$PUSH_HOOK" "$PUSH_HOOK.backup.$(date +%Y%m%d-%H%M%S)"
+    echo "==> pre-push existente respaldado"
+  fi
+  printf '%s' "$PUSH_BODY" > "$PUSH_HOOK" && chmod +x "$PUSH_HOOK"
+  echo "==> hook pre-push instalado ($PUSH_HOOK)"
 fi
 
 # ── 6. Manifiesto de procedencia (SHA-256) ───────────────────────────────────

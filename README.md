@@ -206,7 +206,7 @@ implementa / verifica es estructural, no disciplinaria:
 |---|---|
 | `bash scripts/install.sh` | Instalación idempotente del perfil, política y presets (preserva dependencias opcionales ya instaladas) |
 | `bash scripts/install.sh --with-engram` | Ídem + overlay de memoria Engram |
-| `bash scripts/install.sh --with-hooks` | Ídem + hook pre-commit anti-secretos (`security-gate stage-check`) |
+| `bash scripts/install.sh --with-hooks` | Ídem + hook pre-commit anti-secretos y hook pre-push (suite completa antes de publicar) |
 | `bash scripts/dream-doctor.sh` | Salud de la instalación en 12 chequeos (incluye postura de seguridad y vanguardia) |
 | `pnpm verify` | Compatibilidad contra DSH pineado + validación de presets + contratos |
 | `pnpm typecheck` | `tsgo --noEmit` sobre todo el tooling |

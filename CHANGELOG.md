@@ -7,6 +7,18 @@ y el versionado respeta [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Added (fase 2 — cableado automático)
+
+- **CI con gates mecánicos**: el job `tooling` auto-verifica la deny-list P5
+  del security-gate con las mismas sondas de un operador (`git reset --hard`
+  y `rm -rf` deben salir bloqueados, `pnpm test` debe clasificar P2) y corre
+  `update-guard --offline`. Fallar en CI = política §3–§4 rota en el repo que
+  la declara.
+- **Hook pre-push** (`install.sh --with-hooks`): ningún push (P4
+  EXTERNAL-WRITE) sale sin stage-check + suite completa en verde, con backup
+  de hooks ajenos. Tests v2 de métricas en `dream-metrics-v2.test.ts`
+  (tokens/task, rework% exacto sobre repo Git temporal, ciclos COMPLETE).
+
 ### Added
 
 - **Enforcement mecánico de la política (misión "10/10")**:

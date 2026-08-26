@@ -35,6 +35,26 @@ jobs:
       - name: Unit tests
         run: pnpm test
 
+      # Gates mecánicos de la capa engineering: la deny-list P5 del
+      # security-gate y el stage-check anti-secretos se auto-verifican con las
+      # mismas sondas que usa un operador. Fallar aquí = política §3–§4 rota
+      # en el propio repo que la declara.
+      - name: Mechanical gates self-check
+        run: |
+          set -e
+          if node scripts/security-gate.ts command -- git reset --hard; then
+            echo "security-gate NO bloqueó git reset --hard" >&2; exit 1
+          fi
+          if node scripts/security-gate.ts command -- rm -rf /tmp/probe-x; then
+            echo "security-gate NO bloqueó rm -rf" >&2; exit 1
+          fi
+          node scripts/security-gate.ts classify -- pnpm test | grep -q 'P2'
+          node scripts/security-gate.ts stage-check
+          echo '✔ gates mecánicos OK'
+
+      - name: Vanguardia (update-guard offline)
+        run: node scripts/update-guard.ts --offline
+
       - name: Docs link and path integrity
         run: |
           python3 - <<'EOF'
