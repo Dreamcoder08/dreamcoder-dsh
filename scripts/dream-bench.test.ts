@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 import { journeys, type Journey } from '../bench/corpus.ts'
-import { evaluateStep, formatList, parseArgs, runJourney, validateCorpus } from './dream-bench.ts'
+import { evaluateStep, formatList, main, parseArgs, runJourney, validateCorpus } from './dream-bench.ts'
 
 describe('corpus declarations', () => {
   test('the real corpus is valid: unique j<N> ids, closed axes, runnable steps, declared why', () => {
@@ -89,6 +89,57 @@ describe('cli surface (parseArgs / formatList)', () => {
       assert.match(line, new RegExp(`\\[${j.axis}\\]`))
       assert.match(line, /\(\d+ step\(s\)\)$/)
     }
+  })
+})
+
+describe('--json payload (D1/D2 del review: contrato JSON bajo test)', () => {
+  // Captura el stdout de main() sin tocar consola global más allá del test.
+  const captureStdout = (fn: () => number): { out: string; code: number } => {
+    const chunks: string[] = []
+    const orig = console.log
+    console.log = (...a: unknown[]) => chunks.push(a.map(String).join(' '))
+    try {
+      const code = fn()
+      return { out: chunks.join('\n'), code }
+    } finally {
+      console.log = orig
+    }
+  }
+
+  test('--only j1 --json emite UN objeto JSON válido y coherente', () => {
+    const { out, code } = captureStdout(() => main(['--only', 'j1', '--json']))
+    assert.equal(code, 0)
+    const lines = out.trim().split('\n')
+    assert.equal(lines.length, 1, 'stdout debe ser exactamente una línea JSON')
+    const payload = JSON.parse(lines[0]!) as {
+      kind: string
+      drivenMode: boolean
+      corpusSize: number
+      totals: { completed: number; failed: number; skipped: number }
+      journeys: Array<{ id: string; status: string }>
+      runId: string
+    }
+    assert.equal(payload.kind, 'dream-bench')
+    assert.equal(payload.drivenMode, true)
+    assert.equal(payload.corpusSize, journeys.length)
+    assert.equal(payload.journeys.length, 1)
+    const first = payload.journeys[0]!
+    assert.equal(first.id, 'j1')
+    assert.equal(first.status, 'completed')
+    assert.equal(
+      payload.totals.completed + payload.totals.failed + payload.totals.skipped,
+      payload.corpusSize,
+    )
+    assert.ok(payload.runId.length > 0)
+  })
+
+  test('fallo bajo --json: failed>0 en payload y exit 1 (sin provocar fallo real: journey sintético vía corpus no posible, se valida la aritmética con --only inexistente → exit 4)', () => {
+    // La rama de fallo por journey roto ya está cubierta por runJourney
+    // (test 'runJourney isolates failures'); aquí se fija el contrato CLI:
+    // --only que no matchea NO emite JSON, devuelve exit 4.
+    const { out, code } = captureStdout(() => main(['--only', 'no-existe', '--json']))
+    assert.equal(code, 4)
+    assert.equal(out.trim(), '')
   })
 })
 

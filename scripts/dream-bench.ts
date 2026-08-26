@@ -171,7 +171,9 @@ function writeReceipt(results: JourneyResult[], completed: number, failed: numbe
   writeFileSync(stamp, JSON.stringify(receipt, null, 2))
 }
 
-function main(argv: readonly string[]): number {
+// Exportado para tests (captura de stdout); la guarda invokedFile evita
+// ejecución en import.
+export function main(argv: readonly string[]): number {
   // --only <id,id,…>: subconjunto para entornos sin dependencias de host.
   // --list: muestra el corpus y sale (no ejecuta journeys).
   // --json: stdout es UN objeto JSON machine-readable (resultados por journey).
