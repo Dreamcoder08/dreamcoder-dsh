@@ -174,4 +174,39 @@ export const journeys: readonly Journey[] = [
       },
     ],
   },
+  {
+    id: 'j7',
+    title: 'specs canónicas SDD: roundtrip new→sync→drift→archive',
+    why: 'M13: la spec canónica debe alinearse con su contrato ratificado; una spec inválida NO se archiva (fail-closed) y la archivada lleva SHA-256 en el índice.',
+    axis: 'evidence',
+    steps: [
+      {
+        name: 'new + sync en verde sobre specs-dir temporal',
+        shell:
+          'S=$(mktemp -d) && ' +
+          'node scripts/sdd-specs.ts new --workflow mini-sdd --mission journey-7 --specs-dir "$S" && ' +
+          'node scripts/sdd-specs.ts sync --mission journey-7 --specs-dir "$S"',
+        expectExit: 0,
+      },
+      {
+        name: 'romper una sección → sync falla y archive se niega',
+        shell:
+          'S=$(mktemp -d) && ' +
+          'node scripts/sdd-specs.ts new --workflow mini-sdd --mission journey-7b --specs-dir "$S" && ' +
+          "sed -i '/^## Confirmación$/,+3d' \"$S/journey-7b/spec.md\" && " +
+          '! node scripts/sdd-specs.ts sync --mission journey-7b --specs-dir "$S" ; ' +
+          '! node scripts/sdd-specs.ts archive --mission journey-7b --specs-dir "$S"',
+        expectExit: 0,
+      },
+      {
+        name: 'spec válida → archive mueve a _archive con índice sha256',
+        shell:
+          'S=$(mktemp -d) && ' +
+          'node scripts/sdd-specs.ts new --workflow direct --mission journey-7c --specs-dir "$S" && ' +
+          'node scripts/sdd-specs.ts archive --mission journey-7c --specs-dir "$S" && ' +
+          'grep -q specSha256 "$S/_archive/index.json" && test ! -d "$S/journey-7c"',
+        expectExit: 0,
+      },
+    ],
+  },
 ]

@@ -216,6 +216,7 @@ implementa / verifica es estructural, no disciplinaria:
 | `node scripts/evidence-ledger.ts` | Receipt de misión derivado de Git; `--sdd <misión>` exige el gate SDD |
 | `node scripts/security-gate.ts` | Gate P0–P5: bloquea P5 y rutas sensibles; bypass auditable |
 | `node scripts/sdd-gate.ts` | Orden de etapas SDD exigido en runtime (contratos machine-readable) |
+| `node scripts/sdd-specs.ts` | Specs canónicas SDD: `new`/`sync`/`archive` alineadas al contrato; SHA-256 en el índice de archivo |
 | `node scripts/skill-router.ts` | Presupuesto de skills: top-3 por relevancia, resto diferido |
 | `node scripts/update-guard.ts` | Vanguardia: pin local vs última release upstream (cache offline) |
 
@@ -255,6 +256,7 @@ Fases implementadas:
 - **M10** observabilidad: `dream-doctor.sh` (12 secciones) + `dream-metrics.ts` (tokens/task aprox, rework % derivado de Git, ciclos COMPLETE) + registros en `.evidence/`.
 - **M11** autonomía acotada: goals persistidos + jobs con límites duros (§9).
 - **M12** mini-bench driven: corpus de journeys `bench/` + runner `scripts/dream-bench.ts` — los tests validan declaraciones, solo el modo driven prueba ejecución (recibo en `.evidence/bench-latest.json`).
+- **M13** specs canónicas SDD: `scripts/sdd-specs.ts` persiste la spec de cada misión alineada con su contrato (`sync`) y la archiva con SHA-256 (`archive`, fail-closed).
 
 Enforcement mecánico (misión "10/10"):
 
