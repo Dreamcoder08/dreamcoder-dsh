@@ -130,4 +130,68 @@ describe('dream-metrics.ts', () => {
     assert.equal(out.sessions.inputTokens, 300)
     assert.equal(out.sessions.outputTokens, 30)
   })
+
+  test('aggregates native token-meter projections from the projcache', () => {
+    const ws = mkdtempSync(join(tmpdir(), 'dsh-metrics-'))
+    mkdirSync(join(ws, '.evidence'))
+    const projcache = join(ws, 'session_projcache.json')
+    const totals = (uncached: number, out: number, cr: number, cw: number) => ({
+      uncachedInputTokens: uncached,
+      outputTokens: out,
+      cacheReadTokens: cr,
+      cacheWriteTokens: cw,
+    })
+    writeFileSync(
+      projcache,
+      JSON.stringify({
+        tables: {
+          sessions: {
+            'session-one': {
+              rows: {
+                tokenUsage: { val: { totals: totals(1000, 200, 50_000, 0) } },
+                contextPressure: { val: { pressureTokens: 40_000, contextWindow: 1_000_000 } },
+              },
+            },
+            'session-two': {
+              rows: {
+                tokenUsage: { val: { totals: totals(500, 100, 0, 3000) } },
+                contextPressure: { val: { pressureTokens: 90_000, contextWindow: 200_000 } },
+              },
+            },
+            // proyección ilegible (buckets no enteros): se excluye entera
+            'session-broken': {
+              rows: { tokenUsage: { val: { totals: { uncachedInputTokens: 'x' } } } },
+            },
+          },
+        },
+      }),
+    )
+    const r = runMetrics(ws, ['--projcache', projcache])
+    assert.equal(r.status, 0)
+    const out = JSON.parse(r.stdout) as Record<string, any>
+    assert.equal(out.tokenMeter.sessions, 2)
+    assert.equal(out.tokenMeter.uncachedInputTokens, 1500)
+    assert.equal(out.tokenMeter.outputTokens, 300)
+    assert.equal(out.tokenMeter.cacheReadTokens, 50_000)
+    assert.equal(out.tokenMeter.cacheWriteTokens, 3000)
+    assert.equal(out.tokenMeter.peakPressureTokens, 90_000) // el pico gana, no el último
+    assert.equal(out.tokenMeter.peakContextWindow, 200_000)
+  })
+
+  test('degrades to null peaks when the projcache is missing or corrupt', () => {
+    const ws = mkdtempSync(join(tmpdir(), 'dsh-metrics-'))
+    mkdirSync(join(ws, '.evidence'))
+    const r = runMetrics(ws) // sin --projcache y sin ~/.dsh real que matchee: nulls o ceros
+    assert.equal(r.status, 0)
+    const out = JSON.parse(r.stdout) as Record<string, any>
+    assert.equal(typeof out.tokenMeter.sessions, 'number')
+
+    const corrupt = join(ws, 'corrupt.json')
+    writeFileSync(corrupt, '{ not json')
+    const r2 = runMetrics(ws, ['--projcache', corrupt])
+    assert.equal(r2.status, 0)
+    const out2 = JSON.parse(r2.stdout) as Record<string, any>
+    assert.equal(out2.tokenMeter.sessions, 0)
+    assert.equal(out2.tokenMeter.peakPressureTokens, null)
+  })
 })
