@@ -164,7 +164,7 @@ Flujo típico:
 Verificación del tooling sin instalar nada:
 
 ```bash
-pnpm verify          # compone el perfil y valida presets (verify-compat + verify-presets)
+pnpm verify          # compone el perfil y valida presets y contratos (verify-compat + verify-presets + verify-contracts)
 pnpm typecheck       # tsgo 7.x (TypeScript nativo) sobre todo el tooling
 ```
 

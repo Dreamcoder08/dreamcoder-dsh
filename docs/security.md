@@ -11,8 +11,7 @@ y, en estado parcial, en el puente de hooks por sesión (M14).
 Límite declarado desde el inicio: esto cubre la superficie **determinable** —
 patrones destructivos canónicos, rutas sensibles, secretos en diffs staged—.
 No sustituye el criterio humano ni resiste a un operador malicioso con acceso
-de escritura al mismo repositorio (ver [Modelo de amenazas](#modelo-de-
-amenazas)).
+de escritura al mismo repositorio (ver [Modelo de amenazas](#modelo-de-amenazas)).
 
 ## Jerarquía de permisos P0–P5
 

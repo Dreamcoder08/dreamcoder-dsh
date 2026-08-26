@@ -69,7 +69,7 @@ jobs:
           md_files = ['README.md'] + glob.glob('docs/*.md')
           for f in md_files:
               text = open(f).read()
-              for m in re.finditer(r'\]\(([^)#]+?)(#[^)]*)?\)', text):
+              for m in re.finditer(r'\]\(([^)#\n]+?)(#[^)\n]*)?\)', text):
                   target = m.group(1)
                   if target.startswith(('http', 'mailto')):
                       continue

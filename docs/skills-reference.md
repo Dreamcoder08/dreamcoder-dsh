@@ -207,7 +207,7 @@ del candidato, TODOS los checks pasan (y hay al menos uno), el gate SDD está
 completo cuando se pidió, y el conteo de archivos coincide con `--expected`
 cuando se dio. Cualquier condición fallida produce `FAIL` y exit 1.
 
-Campos del recibo YAML en `.evidence/mission-<misión>-<ts>.yaml`: `mission`,
+Campos del recibo YAML en `.evidence/mission-<misión>-<ts>-<rand>.yaml`: `mission`,
 `recordedAt`, `repository`, `git` (baseSha, candidateSha,
 baseIsAncestorOfCandidate, changedFiles, expectedFiles,
 scopeMatchesExpectation, filesChanged, insertions, deletions), `verification`

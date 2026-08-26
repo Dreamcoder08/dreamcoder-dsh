@@ -178,8 +178,9 @@ Recibo: `.evidence/bench-latest.json` (escritura atómica tmp+rename: dos
 benches concurrentes nunca dejan un recibo a medias) más una copia sellada
 `.evidence/bench-<epoch>.json`. Campos: `kind: dream-bench`,
 `drivenMode: true`, `runId`, `corpusSize`,
-`totals {completed, failed[, skipped]}` y el veredicto por journey
-(`failedStep` y `detail` en los fallidos). Exit codes: `0` todos los journeys
+`totals {completed, failed}` y el veredicto por journey
+(`failedStep` y `detail` en los fallidos; `skipped` aparece solo en el
+payload `--json` de stdout, no en el recibo). Exit codes: `0` todos los journeys
 completaron · `1` alguno falló · `2` corpus inválido (declaraciones) · `4`
 uso inválido o `--only` sin match.
 

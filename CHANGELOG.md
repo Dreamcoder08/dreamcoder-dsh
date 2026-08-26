@@ -59,7 +59,7 @@ y el versionado respeta [Semantic Versioning](https://semver.org/lang/es/).
     consciente de flags globales (`git -C dir`, `terraform -chdir=dir`,
     `kubectl -n ns`) y de forma de ruta para evitar falsos positivos. Hook
     instalable vía `install.sh --with-hooks` (respalda pre-commit ajeno).
-    26 tests.
+    16 tests.
   - `scripts/sdd-gate.ts` — orden de etapas exigido en runtime contra los
     contratos: saltarse una etapa falla (`advance` valida el siguiente id
     esperado); re-iniciar una misión exige `--force` explícito; estado
