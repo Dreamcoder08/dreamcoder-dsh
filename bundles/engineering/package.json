@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Bundle DSH del proyecto Dreamcoder: contrato de persona Gentle-AI para ingeniería y registro de skills propias.",
+  "main": "host.mjs",
+  "description": "Bundle DSH del proyecto Dreamcoder: contrato de persona Gentle-AI para ingeniería, registro de skills propias y comandos in-session (/dream-doctor, /dream-status).",
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"

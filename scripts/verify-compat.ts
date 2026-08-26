@@ -73,6 +73,11 @@ check(
 check('fila agent-presets presente (roster de presets)', /id: agent-presets/.test(config))
 check('fila permission presente (presets de riesgo)', /id: permission/.test(config))
 check('bundle engineering cargado como capa', config.includes('dsh-engineering-bundle'))
+check(
+  'fila dream-commands presente (comandos in-session /dream-doctor, /dream-status)',
+  /id: dream-commands/.test(config) && /name: '@dreamcoder\/dsh-engineering-bundle'/.test(config),
+)
+check('host.mjs del bundle existe (plugin de comandos)', existsSync(join(skillsDir, '..', 'host.mjs')))
 
 console.log('==> Artefactos del bundle:')
 for (const dir of [

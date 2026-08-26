@@ -137,6 +137,17 @@
     # aceptado: el usuario es el recordatorio natural de esa tool.
 
 # -----------------------------------------------------------------------------
+# Insert — dream-commands (este mismo paquete como plugin host).
+# El bundle exporta host.mjs (campo `main`) con un plugin Cordis que registra
+# los comandos in-session `/dream-doctor` y `/dream-status` contra el Service
+# `commands` (@deepseek-ai/dsh-commands, ya compuesto por dsh-base). Defensivo:
+# si el registry no está disponible, el plugin degrada en silencio.
+# -----------------------------------------------------------------------------
+- insert:
+    - id: dream-commands
+      name: '@dreamcoder/dsh-engineering-bundle'
+
+# -----------------------------------------------------------------------------
 # NOTA — skills del bundle.
 # Este bundle ya NO registra `customSkillDirs`: las skills se exponen por la
 # raíz de usuario por defecto de dsh-skill-filesystem (`<dshHome>/skills`),

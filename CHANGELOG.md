@@ -9,6 +9,14 @@ y el versionado respeta [Semantic Versioning](https://semver.org/lang/es/).
 
 ### Added (fase 2 — cableado automático)
 
+- **Comandos in-session `/dream-doctor` y `/dream-status`**: el bundle exporta
+  su primer plugin host (`bundles/engineering/host.mjs`, patrón upstream
+  publish.md: exports nombrados + `ctx.effect` + Service `commands`). Los
+  comandos corren el tooling del repo y devuelven `CommandResult` sin salir
+  de la sesión ni gastar tokens de modelo; degradan en silencio si el
+  registry no está compuesto. Mecanismo verificado contra dsh 0.1.1-rc.2
+  (cadena de carga: entry.ts import → unwrapExports → registry.apply).
+  Requiere reinicio del proceso dsh para cargar código nuevo de bundle.
 - **CI con gates mecánicos**: el job `tooling` auto-verifica la deny-list P5
   del security-gate con las mismas sondas de un operador (`git reset --hard`
   y `rm -rf` deben salir bloqueados, `pnpm test` debe clasificar P2) y corre
