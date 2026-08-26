@@ -102,6 +102,23 @@ test('classify: patrones insensibles a mayúsculas (.PEM)', () => {
   strictEqual(r.status, 1)
 })
 
+// ── Regresiones de la ronda 2 (formas largas de rm) ──────────────────────────
+
+for (const cmd of [
+  ['rm', '--recursive', 'dir'],
+  ['rm', '--force', 'file.txt'],
+] as const) {
+  test(`command: bloquea ${cmd.join(' ')} (forma larga, regresión N1)`, () => {
+    const r = run(['command', '--', ...cmd])
+    strictEqual(r.status, 1, `${cmd.join(' ')} debió bloquearse`)
+  })
+}
+
+test('command: grep --recursive sigue pasando (no FP)', () => {
+  const r = run(['command', '--', 'grep', '--recursive', 'x', '.'])
+  strictEqual(r.status, 0)
+})
+
 test('uso inválido → exit 2', () => {
   const r = run([])
   strictEqual(r.status, 2)

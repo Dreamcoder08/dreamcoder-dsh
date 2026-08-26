@@ -55,3 +55,21 @@ test('workflow inexistente → error limpio', () => {
   strictEqual(r.status, 1)
   ok(/Contrato inexistente|No hay estado/.test(r.stderr), r.stderr)
 })
+
+test('flag desconocida → exit 2 (regresión N2)', () => {
+  gate(['start', '--workflow', 'direct', '--mission', 'fix-t3'])
+  const r = gate(['advance', '--mission', 'fix-t3', '--stage', 'understand', '--note', 'x', '--bogus-flag'])
+  strictEqual(r.status, 2)
+})
+
+test('start repetido sin --force no resetea el progreso', () => {
+  gate(['start', '--workflow', 'mini-sdd', '--mission', 'feat-t4'])
+  gate(['advance', '--mission', 'feat-t4', '--stage', 'propuesta', '--note', 'n'])
+  const r = gate(['start', '--workflow', 'mini-sdd', '--mission', 'feat-t4'])
+  strictEqual(r.status, 1)
+  ok(/ya tiene estado/.test(r.stderr), r.stderr)
+  // El progreso sobrevive: la siguiente etapa esperada sigue siendo la 2ª.
+  const v = gate(['advance', '--mission', 'feat-t4', '--stage', 'implementacion', '--note', 'skip'])
+  strictEqual(v.status, 1)
+  ok(/GATE VIOLADO/.test(v.stderr), v.stderr)
+})

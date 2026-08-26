@@ -54,12 +54,14 @@ const USAGE =
 const repoRoot = join(import.meta.dirname, '..')
 
 function parseNamedArgs(argv: readonly string[]): Record<string, string | true> {
+  const KNOWN = new Set(['workflow', 'mission', 'stage', 'note', 'force'])
   const out: Record<string, string | true> = {}
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === undefined) continue
     if (!a.startsWith('--')) throw new Error(`Argumento desconocido: ${a}`)
     const key = a.slice(2)
+    if (!KNOWN.has(key)) throw new Error(`Argumento desconocido: ${a}`)
     const next = argv[i + 1]
     if (next === undefined || next.startsWith('--')) out[key] = true
     else {

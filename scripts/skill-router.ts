@@ -72,9 +72,11 @@ export function parseFrontmatter(raw: string): {
   // Parser de bloque YAML simple: `clave: [marcador]` seguido de líneas
   // indentadas (block scalars |, >, >- y variantes) o valor en la misma
   // línea; termina en la siguiente clave top-level o fin del frontmatter.
+  // Tolerante a CRLF: el \r final no debe romper el ancla de clave.
   const fields = new Map<string, string>()
   let current: { key: string; value: string } | null = null
-  for (const line of fm.split('\n')) {
+  for (const rawLine of fm.split('\n')) {
+    const line = rawLine.replace(/\r$/, '')
     const keyMatch = line.match(/^([A-Za-z_-]+):[ \t]*(.*)$/)
     if (keyMatch !== null) {
       if (current !== null) fields.set(current.key, current.value.trim())

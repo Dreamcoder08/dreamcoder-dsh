@@ -27,7 +27,10 @@ import { join } from 'node:path'
 // `git -C dir` o `terraform -chdir=d` se separan antes) para cerrar las
 // formas canónicas que la adyacencia simple dejaría pasar.
 export const DESTRUCTIVE_PATTERNS: readonly { re: RegExp; why: string }[] = [
-  { re: /\brm\s+(?:-{1,2}[\w-]+\s+)*-\w*[rR]\w*\s|\brm\s+(?:-{1,2}[\w-]+\s+)*-\w*f\w*\s/, why: 'rm recursivo/forzado' },
+  // rm recursivo/forzado: formas cortas (-rf, -r, -f…) y largas (--recursive,
+  // --force). La alternativa larga está anclada al binario rm, por lo que no
+  // criminaliza `grep/cp --recursive`.
+  { re: /\brm\s+(?:-{1,2}[\w-]+\s+)*-\w*[rRfF]\w*\s|\brm\s+(?:--recursive|--force)\b/, why: 'rm recursivo/forzado' },
   { re: /\bgit\s+reset\s+--hard\b/, why: 'git reset --hard' },
   { re: /\bgit\s+clean\b[^|;&]*-[a-zA-Z]*[fdx]/, why: 'git clean -fdx' },
   { re: /\bgit\s+push\b[^|;&]*(--force\b|--force-with-lease\b|-f\b|\s\+[\w./-]+)/, why: 'git push forzado (flag o refspec +ref)' },
