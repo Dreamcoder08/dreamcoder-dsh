@@ -56,7 +56,7 @@ jobs:
       # gates + manifiesto, j7 specs SDD). j4-j6 requieren dsh/DSH_HOME real —
       # esos son del gate autoritativo local (`pnpm bench` completo).
       - name: Mini-bench driven (host-free journeys)
-        run: node scripts/dream-bench.ts --only j1,j2,j3,j7
+        run: node scripts/dream-bench.ts --only j1,j2,j3,j7,j8
 
       - name: Vanguardia (update-guard offline)
         run: node scripts/update-guard.ts --offline

@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node @REPO_ROOT@/scripts/cc-hook-guard.ts",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -8,6 +8,7 @@
 #   bash scripts/install.sh                  # perfil + política + presets
 #   bash scripts/install.sh --with-engram    # además habilita el overlay MCP Engram
 #   bash scripts/install.sh --with-hooks     # además instala el hook pre-commit de seguridad
+#   bash scripts/install.sh --with-hook-bridge[=<checkout DSH>]  # puente de hooks Claude Code (file: link local)
 #
 # Orden deliberado: `dsh plugin` debe ver el perfil SIN package.json en el
 # primer arranque para ejecutar initProfile, que escribe las piezas que un
@@ -28,11 +29,16 @@ PRESETS_DIR="$DSH_HOME/.agent-presets"
 WITH_ENGRAM=false
 WITH_EXTERNAL_SUBAGENTS=false
 WITH_HOOKS=false
+WITH_HOOK_BRIDGE=""
 for arg in "$@"; do
   case "$arg" in
     --with-engram) WITH_ENGRAM=true ;;
     --with-external-subagents) WITH_EXTERNAL_SUBAGENTS=true ;;
     --with-hooks) WITH_HOOKS=true ;;
+    --with-hook-bridge)
+      WITH_HOOK_BRIDGE="${DSH_CHECKOUT:-$HOME/deepseek-harness}" ;;
+    --with-hook-bridge=*)
+      WITH_HOOK_BRIDGE="${arg#*=}" ;;
     *) echo "Argumento desconocido: $arg" >&2; exit 2 ;;
   esac
 done
@@ -212,6 +218,57 @@ if $WITH_EXTERNAL_SUBAGENTS && ! grep -q "subagent-codex" "$PROFILE_PATCH" 2>/de
     echo "ERROR: el append rompió la composición; patch restaurado desde $BACKUP." >&2
     echo "  Fusiona manualmente memory/subagents-external.cordis.yml." >&2
     exit 1
+  fi
+fi
+
+# ── 4d. Puente de hooks dialecto Claude Code (opcional, --with-hook-bridge) ──
+# Enforcement mecánico DENTRO de cada sesión: un hook PreToolUse(Bash) que
+# decide con scripts/cc-hook-guard.ts (deny-list P5 §3 + rutas sensibles §4).
+# El paquete del puente NO está publicado en npm: se linkea file: desde un
+# checkout local de DeepSeek Harness — compromiso de portabilidad DECLARADO.
+if [ -n "$WITH_HOOK_BRIDGE" ]; then
+  BRIDGE_PKG="$WITH_HOOK_BRIDGE/packages/hooks/hooks-claude-code"
+  if [ ! -f "$BRIDGE_PKG/package.json" ]; then
+    echo "ERROR: no existe $BRIDGE_PKG — pasa el checkout con --with-hook-bridge=<ruta>" >&2
+    exit 1
+  fi
+  echo "==> Añadiendo puente de hooks desde $BRIDGE_PKG"
+  dsh plugin --profile "$PROFILE_NAME" add "file:$BRIDGE_PKG" </dev/null
+  dsh plugin --profile "$PROFILE_NAME" install </dev/null
+
+  HOOKS_DIR="$DSH_HOME/hooks"
+  mkdir -p "$HOOKS_DIR"
+  sed "s|@REPO_ROOT@|$REPO_ROOT|g" \
+    "$REPO_ROOT/hooks/claude-hooks.template.json" > "$HOOKS_DIR/dreamcoder-hooks.json"
+
+  BRIDGE_ROW="
+# ── Puente de hooks (dialecto Claude Code) — gestionado por install.sh ──
+- insert:
+    - id: hooks-claude-code
+      name: '@deepseek-ai/dsh-hooks-claude-code'
+      config:
+        configPath: $HOOKS_DIR/dreamcoder-hooks.json
+"
+  if grep -q 'hooks-claude-code' "$PROFILE_PATCH" 2>/dev/null; then
+    echo "==> puente de hooks ya habilitado en el perfil"
+  elif [ ! -f "$PROFILE_PATCH" ]; then
+    printf '%s\n' "$BRIDGE_ROW" > "$PROFILE_PATCH"
+    echo "==> $PROFILE_PATCH creado con el puente de hooks"
+  elif grep -Eq '^[[:space:]]*\[[[:space:]]*\][[:space:]]*$' "$PROFILE_PATCH" \
+       && [ "$(grep -cv '^[[:space:]]*\(#.*\)\?[[:space:]]*$' "$PROFILE_PATCH")" -le 1 ]; then
+    printf '%s\n' "$BRIDGE_ROW" > "$PROFILE_PATCH"
+    echo "==> Capa vacía reemplazada: puente de hooks instalado"
+  else
+    BACKUP="$PROFILE_PATCH.backup.$(date +%Y%m%d-%H%M%S)"
+    cp "$PROFILE_PATCH" "$BACKUP"
+    printf '\n%s\n' "$BRIDGE_ROW" >> "$PROFILE_PATCH"
+    if dsh --profile "$PROFILE_NAME" --dump-config >/dev/null 2>&1; then
+      echo "==> puente de hooks añadido a $PROFILE_PATCH (composición validada)"
+    else
+      mv "$BACKUP" "$PROFILE_PATCH"
+      echo "ERROR: el append del puente rompió la composición; patch restaurado." >&2
+      exit 1
+    fi
   fi
 fi
 

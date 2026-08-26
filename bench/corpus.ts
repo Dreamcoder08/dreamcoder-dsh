@@ -209,4 +209,30 @@ export const journeys: readonly Journey[] = [
       },
     ],
   },
+  {
+    id: 'j8',
+    title: 'cc-hook-guard decide bloquear/permitir por exit code',
+    why: 'M14: el enforcement mecánico debe vivir DENTRO de cada sesión (PreToolUse del puente Claude Code), no solo en pre-commit — la decisión la toma security-gate, no el modelo.',
+    axis: 'gates',
+    steps: [
+      {
+        name: 'P5 vía Bash → exit 2 con feedback accionable',
+        shell:
+          'echo \'{"tool_name":"Bash","tool_input":{"command":"rm -rf /tmp/x"}}\' | node scripts/cc-hook-guard.ts ; test $? -eq 2',
+        expectExit: 0,
+      },
+      {
+        name: 'comando inocuo → exit 0 sin ruido',
+        shell:
+          'echo \'{"tool_name":"Bash","tool_input":{"command":"ls -la"}}\' | node scripts/cc-hook-guard.ts',
+        expectExit: 0,
+      },
+      {
+        name: 'ruta sensible §4 → exit 2',
+        shell:
+          'echo \'{"tool_name":"Bash","tool_input":{"command":"cat ~/.ssh/id_rsa"}}\' | node scripts/cc-hook-guard.ts ; test $? -eq 2',
+        expectExit: 0,
+      },
+    ],
+  },
 ]

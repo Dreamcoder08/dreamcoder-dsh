@@ -257,6 +257,7 @@ Fases implementadas:
 - **M11** autonomía acotada: goals persistidos + jobs con límites duros (§9).
 - **M12** mini-bench driven: corpus de journeys `bench/` + runner `scripts/dream-bench.ts` — los tests validan declaraciones, solo el modo driven prueba ejecución (recibo en `.evidence/bench-latest.json`).
 - **M13** specs canónicas SDD: `scripts/sdd-specs.ts` persiste la spec de cada misión alineada con su contrato (`sync`) y la archiva con SHA-256 (`archive`, fail-closed).
+- **M14** hook bridge Claude Code (parcial): `scripts/cc-hook-guard.ts` + `hooks/claude-hooks.template.json` + flag `install.sh --with-hook-bridge` listos; la ACTIVACIÓN del puente queda bloqueada por empaquetado upstream — `@deepseek-ai/dsh-hooks-claude-code` declara deps `workspace:^` de paquetes sin publicar en npm, imposibles de resolver fuera del monorepo DSH. El instalador falla RUIDOSO nombrando el paquete; se reactiva cuando upstream publique.
 
 Enforcement mecánico (misión "10/10"):
 
