@@ -238,7 +238,11 @@ fi
 # dream-doctor.sh (sección 13) detecte drift posterior a la instalación.
 MANIFEST_SCRIPT="$REPO_ROOT/scripts/dream-manifest.sh"
 if [ -f "$MANIFEST_SCRIPT" ]; then
-  bash "$MANIFEST_SCRIPT" generate "$DSH_HOME" "$REPO_ROOT" "$PROFILE_NAME"
+  # Degradar con AVISO, nunca abortar la instalación completa por el manifiesto
+  # (generate sale 1 si algún artefacto falta; el trabajo real ya está hecho).
+  if ! bash "$MANIFEST_SCRIPT" generate "$DSH_HOME" "$REPO_ROOT" "$PROFILE_NAME"; then
+    echo "AVISO: manifiesto de procedencia parcial — revisa los avisos previos" >&2
+  fi
 else
   echo "AVISO: falta scripts/dream-manifest.sh; sin manifiesto de procedencia" >&2
 fi
