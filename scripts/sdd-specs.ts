@@ -197,7 +197,12 @@ function main(argv: readonly string[]): number {
         process.exit(2)
       }
       const srcDir = join(specsDir, mission)
-      const report = syncSpec(join(srcDir, 'spec.md'), join(repoRoot, 'contracts'))
+      const specPath = join(srcDir, 'spec.md')
+      if (!existsSync(specPath)) {
+        console.error(`✘ '${mission}' no tiene spec.md bajo ${srcDir} — nada que archivar`)
+        return 1
+      }
+      const report = syncSpec(specPath, join(repoRoot, 'contracts'))
       if (!report.ok) {
         console.error(`✘ no se archiva una spec inválida ('${mission}'): corre sync primero`)
         for (const e of report.errors) console.error(`  - ${e}`)
@@ -206,10 +211,22 @@ function main(argv: readonly string[]): number {
       const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, '')
       const dest = join(specsDir, '_archive', `${stamp}-${mission}`)
       mkdirSync(join(specsDir, '_archive'), { recursive: true })
-      const specSha = sha256File(join(srcDir, 'spec.md'))
-      renameSync(srcDir, dest)
+      // El índice se valida ANTES del rename: si estuviera corrupto, la misión
+      // NO se mueve y el ledger queda consistente (fail-closed pre-mutación).
       const indexPath = join(specsDir, '_archive', 'index.json')
-      const index = existsSync(indexPath) ? (JSON.parse(readFileSync(indexPath, 'utf8')) as unknown[]) : []
+      let index: unknown[] = []
+      if (existsSync(indexPath)) {
+        try {
+          const parsed: unknown = JSON.parse(readFileSync(indexPath, 'utf8'))
+          if (!Array.isArray(parsed)) throw new Error('index.json no es un array')
+          index = parsed
+        } catch (err) {
+          console.error(`✘ index.json corrupto o inválido (${String(err)}) — repáralo antes de archivar`)
+          return 1
+        }
+      }
+      const specSha = sha256File(specPath)
+      renameSync(srcDir, dest)
       index.push({ mission, archivedAt: new Date().toISOString(), path: dest.replace(`${process.cwd()}/`, ''), specSha256: specSha })
       writeFileSync(indexPath, JSON.stringify(index, null, 2))
       console.log(`✔ spec archivada: ${dest} (sha256 ${specSha.slice(0, 12)}…, índice actualizado)`)
@@ -224,7 +241,12 @@ function main(argv: readonly string[]): number {
       for (const d of readdirSync(specsDir, { withFileTypes: true })) {
         if (!d.isDirectory() || d.name === '_archive') continue
         count++
-        const body = readFileSync(join(specsDir, d.name, 'spec.md'), 'utf8')
+        const specFile = join(specsDir, d.name, 'spec.md')
+        if (!existsSync(specFile)) {
+          console.log(`· ${d.name}: directorio SIN spec.md — estado desconocido`)
+          continue
+        }
+        const body = readFileSync(specFile, 'utf8')
         const fm = parseFrontMatter(body)
         console.log(`· ${d.name}: ${fm === null ? 'spec SIN front matter válido' : `${fm.workflow} (${fm.status}, creada ${fm.created})`}`)
       }

@@ -41,8 +41,32 @@ describe('sdd-specs.ts', () => {
     assert.match(r.stderr, /explore/)
   })
 
-  test('archive refuses an invalid spec and archives a valid one with sha256 index', () => {
+  test('a mission directory without spec.md is skipped loudly, never crashes', () => {
     const ws = makeWs()
+    mkdirSync(join(ws, 'ghost'), { recursive: true }) // dir sin spec.md
+    const st = run(ws, ['status'])
+    assert.equal(st.status, 0)
+    assert.match(st.stdout, /SIN spec\.md/)
+    const r = run(ws, ['archive', '--mission', 'ghost'])
+    assert.equal(r.status, 1)
+    assert.match(r.stderr, /nada que archivar/)
+    assert.ok(!existsSync(join(ws, '_archive')), 'no se crea _archive sin archivar nada')
+  })
+
+  test('archive with a corrupt index fails BEFORE mutating the specs tree', () => {
+    const ws = makeWs()
+    run(ws, ['new', '--workflow', 'direct', '--mission', 'keep-me'])
+    mkdirSync(join(ws, '_archive'), { recursive: true })
+    writeFileSync(join(ws, '_archive', 'index.json'), '{ corrupt')
+    const before = readFileSync(join(ws, 'keep-me', 'spec.md'), 'utf8')
+    const r = run(ws, ['archive', '--mission', 'keep-me'])
+    assert.equal(r.status, 1)
+    assert.match(r.stderr, /corrupto/)
+    assert.ok(existsSync(join(ws, 'keep-me', 'spec.md')), 'la misión NO se movió con índice roto')
+    assert.equal(readFileSync(join(ws, 'keep-me', 'spec.md'), 'utf8'), before)
+  })
+
+  test('archive refuses an invalid spec and archives a valid one with sha256 index', () => {    const ws = makeWs()
     // invalid first: remove a section → archive must refuse
     run(ws, ['new', '--workflow', 'direct', '--mission', 'hot-z'])
     const p = join(ws, 'hot-z', 'spec.md')
