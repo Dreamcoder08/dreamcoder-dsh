@@ -454,6 +454,38 @@ verificado, se dice acá y en el documento de la capacidad — no se deja implí
 | Comandos in-session (`/dream-*`) | Los cuatro figuran registrados en el host vivo, y `/dream-presets` monta los seis presets | Que un cambio en `host.mjs` se vea sin reiniciar: el plugin se carga con el perfil. Un servicio que el plugin consuma tiene que estar en su `inject`, o el comando no existe y el fallo es invisible |
 | Formato del código | Nada | Que exista un estilo uniforme: no hay formatter ni lint cableados (la config de Biome se retiró por muerta: nadie la ejecutaba) |
 
+## Estado verificado
+
+Los números de abajo son la base empírica de la tabla anterior: cada uno tiene el
+comando que lo reproduce, y ninguno se actualiza a mano sin volver a correrlo.
+Los estructurales (presets, skills, contratos, jornadas) además están **atados
+por gates** —`preset-mount-command`, `skill-contract`, `verify-contracts` y
+`bench-coverage` fallan si el artefacto y el número divergen—.
+
+| Métrica | Valor | Comando que lo reproduce |
+|---|---:|---|
+| Tests / suites | 216 / 33 | `node --test --test-reporter=tap 'scripts/*.test.ts'` |
+| Archivos de test | 24 | `ls scripts/*.test.ts \| wc -l` |
+| Agent presets | 6 | `ls -d agents/*/ \| wc -l` |
+| Skills del bundle | 7 | `ls -d bundles/engineering/skills/*/ \| wc -l` |
+| Contratos SDD | 3 | `ls contracts/*.json \| wc -l` |
+| Jornadas del bench | 8 (6 host-free, 2 host) | `node scripts/dream-bench.ts --list` |
+| LOC de scripts | 7.230 | `cat scripts/*.ts scripts/*.sh \| wc -l` |
+| LOC de documentación | 2.525 | `cat README.md docs/*.md \| wc -l` |
+| LOC versionado del repo | 13.633 | `git ls-files \| grep -E '\.(ts\|sh\|mjs\|md\|yml\|json)$' \| xargs cat \| wc -l` |
+
+Las tres filas de LOC son una **instantánea del árbol en el momento de escribir
+esta sección**, no un invariante: cualquier edición de un doc las mueve. Las filas
+estructurales sí son invariantes verificados — si un preset o una skill
+desaparece, el gate correspondiente falla antes de que este README mienta.
+
+Como referencia de proporción, medida sobre el mismo tipo de conteo: este repo
+completo (13.633 líneas versionadas) ocupa lo mismo que el directorio
+`extensions/` del proyecto de referencia (13.685) y la mitad de su `lib/`
+(26.117). La documentación (2.525) es algo más de un tercio del código de
+scripts (7.230): suficiente para que cada decisión esté escrita, no tanto como
+para competir con el código.
+
 ## Desarrollo
 
 ```bash

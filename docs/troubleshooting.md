@@ -1,5 +1,7 @@
 # Troubleshooting
 
+← [Volver al README](../README.md)
+
 Diagnóstico de la instalación de Dreamcoder DSH. La regla que gobierna este
 documento es la misma del bundle: ninguna afirmación sin evidencia observable.
 Cada problema arranca de un síntoma concreto (con salida literal), explica la
@@ -20,6 +22,23 @@ resumen final es literal:
 ✔ Doctor: instalación saludable.
 ✘ Doctor: N problema(s). Revisa las líneas ✘.
 ```
+
+**Lo que el doctor NO chequea** — importa tanto como lo que sí, porque un `✔`
+sobre algo que nadie miró se lee como garantía:
+
+- el **catálogo efectivo** de un rol: monta la instalación, no la composición de
+  cada preset. Para eso está `/dream-presets` (monta los seis) y `/dream-tools`
+  (lee el catálogo del agente actual);
+- los **hooks de tus repos**: verifica el hook de *este* repo, no el de tus
+  proyectos;
+- el **enforcement dentro de una sesión**: no hay tal cosa salvo el puente de
+  hooks, y ese es un límite declarado;
+- la **suite de tests** ni el bench: eso es `pnpm test` y `pnpm bench`;
+- ninguna **afirmación del README**: las que son verificables tienen su gate en
+  `scripts/*.test.ts`, no acá.
+
+Un doctor en `0` significa "la instalación está sana", no "el sistema hace todo
+lo que promete".
 
 | # | Chequeo | Qué verifica | Remedio típico |
 |---|---------|--------------|----------------|

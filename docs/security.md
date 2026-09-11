@@ -1,5 +1,7 @@
 # Seguridad
 
+← [Volver al README](../README.md)
+
 La seguridad de este bundle es **mecánica, no disciplinaria**: no consiste en
 pedirle al modelo que sea cuidadoso, sino en clasificar comandos contra listas
 cerradas y bloquear lo irreversible sin intervención humana. La base normativa
@@ -12,6 +14,27 @@ Límite declarado desde el inicio: esto cubre la superficie **determinable** —
 patrones destructivos canónicos, rutas sensibles, secretos en diffs staged—.
 No sustituye el criterio humano ni resiste a un operador malicioso con acceso
 de escritura al mismo repositorio (ver [Modelo de amenazas](#modelo-de-amenazas)).
+
+## Qué se sostiene y qué no
+
+Cada afirmación de enforcement de este documento, contra la evidencia que la
+sostiene. Las filas con evidencia vacía son tan parte del contrato como las
+demás: declaran lo que este aparato **no** hace, para que nadie lo asuma.
+
+| Superficie | Evidencia en el código | Afirmación sostenida |
+|---|---|---|
+| P5 canónicos (`git reset --hard`, `rm -rf`, `git clean -fdx`, `push --force`, `terraform destroy`, `kubectl delete`) | Deny-list cerrada en [`scripts/security-gate.ts`](../scripts/security-gate.ts) con exit 1; el self-check de CI falla si deja de bloquear | Bloquea los patrones **enumerados**. No clasifica el efecto: un `rm -rf` dentro de un `pnpm build` pasa |
+| Rutas sensibles (`~/.ssh`, `.env*`, `*.pem`, `id_rsa*`, credenciales) | Deny-list de rutas, aplicada en clasificación y en `stage-check` | Bloquea las rutas enumeradas y las que aparezcan en el **diff staged**. No inspecciona contenido de archivos fuera del staged |
+| Secretos en commits | Hook `pre-commit` que corre `stage-check` | Protege los commits de **este** repo, y solo tras `install.sh --with-hooks`. Sin el hook no hay enforcement |
+| Bypass | `DC_SECURITY_BYPASS="quién y cuándo"` deja traza en `.evidence/security-gate-audit.jsonl`; si la traza no se puede escribir, deniega | Garantiza **trazabilidad**, no imposibilidad. Quien tenga escritura en el repo puede editar la traza |
+| Clasificación informativa | `classify` etiqueta P0–P5 con exit 0 | Etiqueta; no bloquea. P3/P4 legítimas pero riesgosas no se impiden |
+| Enforcement sobre las tool calls del modelo | Ninguna: `security-gate` no aparece en ninguna fila Cordis compuesta | Que un `rm -rf` propuesto por el modelo se bloquee solo. El gate actúa cuando el comando pasa por él —CLI o hook de Git—, no como guardia de sesión |
+| Enforcement dentro de la sesión | Solo el puente de hooks Claude Code (M14), declarado bloqueado upstream | Nada: en el estado actual no hay enforcement in-session |
+| Resistencia a un operador hostil | — | No se afirma, en ninguna forma |
+
+Las tres últimas filas explican por qué este documento dice "mecánica" y no
+"segura": el aparato mueve la decisión de la disciplina del modelo a listas
+verificables, y nada más que eso.
 
 ## Jerarquía de permisos P0–P5
 

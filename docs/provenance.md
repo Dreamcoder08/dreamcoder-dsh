@@ -1,5 +1,7 @@
 # Procedencia y atribución
 
+← [Volver al README](../README.md)
+
 Este documento declara de dónde viene cada skill del bundle. Existe por dos
 razones concretas:
 

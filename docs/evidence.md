@@ -1,5 +1,7 @@
 # Evidencia y receipts
 
+← [Volver al README](../README.md)
+
 La regla central del bundle: **ninguna afirmación de "hecho", "funciona" o
 "roto" sin evidencia observable** — salida de test, `git diff`, exit code o
 salida literal de comando. "Debería funcionar" es hipótesis, no resultado.
@@ -245,6 +247,28 @@ flowchart TD
     I --> J["Receipt:\nevidence-ledger derivado de Git,\ncerrado con SHA256"]
     G -.->|"--sdd exige contrato completo"| J
 ```
+
+## Lo que un receipt no prueba
+
+Un recibo derivado de Git acota mucho, pero no es una garantía de corrección.
+Dicho explícito, para que nadie lo lea como más de lo que es:
+
+- **Prueba que los checks corrieron y pasaron**, no que sean los checks
+  correctos. Un `--check` mal elegido produce un recibo verde y vacío;
+- **prueba el estado del árbol, no el comportamiento en runtime**: que los seis
+  presets monten y que la máscara de rol se aplique en una sesión real son cosas
+  distintas, y el receipt cubre la primera;
+- **el conteo de archivos cambiados es una expectativa declarada**, no una
+  inferencia: si el cambio real excede lo previsto, el receipt lo denuncia solo
+  cuando el número declarado existe;
+- **el SHA256 del recibo acredita integridad del archivo**, no procedencia: quien
+  pueda reescribir el recibo puede recalcular su hash;
+- **no cubre el host**: j5 y j6 del bench necesitan un `dsh` real y una
+  instalación, así que viven en el gate local, no en CI.
+
+La regla que sí sostiene el sistema es más modesta y más útil: **el agente
+afirma menos y el sistema registra más**. Todo lo anterior son los límites de
+ese registro.
 
 ## Ver también
 

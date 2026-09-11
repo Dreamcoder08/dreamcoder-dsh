@@ -1,5 +1,7 @@
 # New harness target: DeepSeek Harness (DSH), with a working reference implementation
 
+← [Back to README](../README.md)
+
 <!-- Borrador publicado como issue en Gentleman-Programming/gentle-ai (Feature Request). -->
 
 ## 💡 Problem Statement

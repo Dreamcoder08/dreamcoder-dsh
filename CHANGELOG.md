@@ -7,6 +7,41 @@ y el versionado respeta [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Changed (ronda de calidad 6 — documentación al nivel del referente)
+
+Se tomaron los cuatro rasgos que definen la documentación de gentle-pi y se
+aplicaron a la de este repo: navegación en cada doc, apertura por decisión y no
+por contexto, **invariantes negativos** explícitos y **confianza autoevaluada**
+con una columna que gradúa la propia afirmación.
+
+- **README — "Estado verificado"**: tabla de métricas con el comando exacto que
+  reproduce cada número. Las filas estructurales (presets, skills, contratos,
+  jornadas) están atadas por gates; las de LOC se declaran **instantánea fechada**
+  porque cualquier edición de un doc las mueve. Se corrigieron dos afirmaciones
+  propias antes de publicarlas: la proporción documentación/scripts era falsa en
+  el borrador (decía "más documentación que andamiaje") y la comparación con el
+  referente se reemplazó por números medidos del mismo tipo.
+- **`docs/security.md` — "Qué se sostiene y qué no"**: tabla superficie ↔
+  evidencia en el código ↔ afirmación sostenida, con tres filas de evidencia
+  vacía que declaran lo que el aparato NO hace (no hay guardia de sesión, no hay
+  enforcement in-session, no hay resistencia a un operador hostil).
+- **`docs/architecture.md` — "Quién es dueño de qué"**: tabla superficie ↔ dueño
+  ↔ por qué, más el párrafo explícito de lo que este repositorio **no** posee (no
+  toca el core de DSH, no publica en npm, no implementa sandbox ni aprobación, no
+  tiene autoridad sobre la entrega).
+- **`docs/troubleshooting.md` — "Lo que el doctor NO chequea"**: el catálogo
+  efectivo de un rol, los hooks de otros repos, el enforcement in-session, la
+  suite y las afirmaciones del README. Un `0` significa "instalación sana", no
+  "el sistema hace todo lo que promete".
+- **`docs/evidence.md` — "Lo que un receipt no prueba"**: cinco límites del
+  recibo derivado de Git, incluido que acredita integridad del archivo y no
+  procedencia.
+- Navegación `← Volver al README` en los ocho documentos (en inglés donde el doc
+  está en inglés).
+
+Evidencia: integridad de enlaces y rutas OK; suite 216/216; métricas medidas con
+los comandos publicados en el propio README.
+
 ### Fixed (ronda de calidad 5 — un falso positivo propio, cazado antes de creerlo)
 
 - **`/dream-tools` ya no puede dar un verde falso.** Ante un agente que **no se

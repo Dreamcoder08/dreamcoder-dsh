@@ -1,5 +1,7 @@
 # Referencia de skills
 
+← [Volver al README](../README.md)
+
 Las siete skills del bundle engineering son **contratos LLM-first**: cada una
 declara un trigger de activación y desarrolla reglas duras, puertas de decisión
 y un contrato de salida verificable. No son tutoriales: son instrucciones que

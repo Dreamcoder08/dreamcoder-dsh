@@ -1,5 +1,7 @@
 # Borrador de issue — Gentleman-Programming/gentle-ai
 
+← [Volver al README](../README.md)
+
 > Estado: borrador para revisión de Dreamcoder08. No publicado.
 > Plantilla: Feature Request · Área: Catalog/Steps
 

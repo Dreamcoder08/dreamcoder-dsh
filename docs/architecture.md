@@ -1,11 +1,35 @@
 # Arquitectura
 
+← [Volver al README](../README.md)
+
 Este documento explica las **decisiones de diseño** de la capa de ingeniería
 Dreamcoder sobre DeepSeek Harness: por qué existe cada pieza, qué contrato
 cumple y cómo falla cuando falla. No repite el uso diario —para eso está el
 [README](../README.md)— ni el catálogo operativo ([skills](skills-reference.md),
 [troubleshooting](troubleshooting.md)). Cada afirmación sale de los archivos
 fuente que cita; nada es aspiracional.
+
+## Quién es dueño de qué
+
+Dos planos, y la elección no es "cuán de agente suena" sino si la cosa debe
+compartirse. Una fila que publica un servicio y tiene un consumidor fuera del
+plano-agente no puede vivir en un preset: su lugar es el host.
+
+| Superficie | Dueño | Por qué |
+|---|---|---|
+| Registries (`tools`, `skills`, `systemPrompt`, `agents`, `commands`) | Composiciones de DSH (host) | Un registro por proceso; un preset solo aporta filas a la capa de su scope |
+| Stack de sandbox y aprobación, ruta de modelo, persistencia de sesión | Composiciones de DSH (host) | Un preset es tan privilegiado como los plugins que nombra: dejar que relaje su propio confinamiento anularía el confinamiento |
+| Persona, secciones de prompt, catálogo de tools del rol, compaction | `agents/<rol>/agent.cordis.yml` (plano-agente) | Es lo que **una** sesión aporta a los registries; se desmonta con ella |
+| Contrato de diez etapas y reglas de evidencia | `bundles/engineering/cordis.patch.yml` (override de `system-prompt`) | Texto de prompt del perfil entero, no de un rol |
+| Comandos in-session `/dream-*` | `bundles/engineering/host.mjs` (insert del patch) | Consumen el registry `commands` del host y corren tooling out-of-tree |
+| Máscara de tools por rol | `bundles/tool-restrict/` referenciado por cada preset | Publica nada; consume `tools` y `agentPresets`, y actúa en el scope del agente |
+| Hooks de Git, política global `AGENTS.md`, manifiesto de procedencia | `scripts/install.sh` | Escriben fuera del workspace: son operaciones de instalación, no composición |
+
+Lo que este repositorio **no** es dueño, dicho explícitamente para que nadie lo
+busque acá: no modifica el core de DSH, no publica paquetes en npm, no compone
+las filas del host, no implementa sandbox ni aprobación, y no tiene autoridad
+sobre la entrega —commit, push, PR y release siguen la política ordinaria del
+repositorio—.
 
 ## Posición en la pila
 
