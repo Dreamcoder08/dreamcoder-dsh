@@ -1,0 +1,22 @@
+# Dependabot: mantiene frescos los pines del CI.
+#
+# El workflow fija cada acción por SHA (una etiqueta móvil puede repuntarse sin
+# que este repositorio cambie). Fijar por SHA sin un mecanismo que proponga los
+# siguientes envejece en silencio: eso es lo que cubre esta configuración.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(ci)"
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
