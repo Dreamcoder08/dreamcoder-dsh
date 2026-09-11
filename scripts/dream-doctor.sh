@@ -58,8 +58,13 @@ for preset_dir in "$REPO_ROOT"/agents/*/; do
   role="$(basename "$preset_dir")"
   link="$DSH_HOME/.agent-presets/$role"
   if [ ! -f "$preset_dir/agent.cordis.yml" ]; then bad "preset '$role': falta agent.cordis.yml en el repo"
-  elif [ -e "$link" ] || [ -L "$link" ]; then ok "preset '$role' enlazado"
-  else bad "preset '$role' NO enlazado en $link"; fi
+  # Exigimos directorio REAL: dsh-agent-presets descubre con Dirent.isDirectory(),
+  # que es FALSE para un symlink, así que un preset enlazado como directorio está
+  # instalado y a la vez es invisible para el roster. Comprobar solo existencia
+  # (lo que hacía este chequeo) reportaba saludable una instalación inservible.
+  elif [ -L "$link" ]; then bad "preset '$role': symlink de directorio en $link — el roster lo ignora (reinstala)"
+  elif [ -f "$link/agent.cordis.yml" ]; then ok "preset '$role' visible para el roster (directorio real)"
+  else bad "preset '$role' NO instalado en $link"; fi
 done
 
 echo "── 5. Skills del bundle"

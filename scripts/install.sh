@@ -65,9 +65,12 @@ fi
 
 # El manifiesto del repo es la fuente de verdad de la lista de bundles
 # (user-owned: la resolución de cada nombre es dos-anclada, instalación DSH
-# primero, así que base y web-app no necesitan ser dependencias). El spec
-# `link:` es una PLANTILLA con @BUNDLE_DIR@: se resuelve a la ruta real de
-# esta máquina para que el repo no contenga rutas absolutas.
+# primero, así que base y web-app no necesitan ser dependencias). El spec del
+# template es `link:@BUNDLE_DIR@`; el reemplazo SUSTITUYE el prefijo `link:`
+# junto con el placeholder, así que el manifiesto instalado guarda la ruta
+# absoluta pelada. pnpm la resuelve como symlink al directorio del repo (no una
+# copia), que es lo que mantiene viva la edición del repo — verificado en
+# $DSH_HOME/profiles/engineering/node_modules/@dreamcoder/.
 #
 # FUSIÓN IDEMPOTENTE: si el manifiesto instalado tiene dependencias propias
 # (p. ej. los subagentes externos añadidos por --with-external-subagents en
@@ -75,7 +78,7 @@ fi
 # dejaría los overrides del patch apuntando a paquetes ausentes.
 node --input-type=module -e '
 import { readFileSync, writeFileSync } from "node:fs";
-const [tmplPath, curPath, outPath, bundleDir] = process.argv.slice(1);
+const [tmplPath, curPath, outPath, bundleDir, restrictDir] = process.argv.slice(1);
 const tmpl = JSON.parse(readFileSync(tmplPath, "utf8"));
 let preserved = {};
 try {
@@ -91,12 +94,14 @@ const merged = {
 };
 merged.dependencies = Object.fromEntries(
   Object.entries(merged.dependencies).map(([n, s]) =>
-    [n, typeof s === "string" ? s.replace("link:@BUNDLE_DIR@", bundleDir) : s]),
+    [n, typeof s === "string"
+      ? s.replace("link:@BUNDLE_DIR@", bundleDir).replace("link:@RESTRICT_DIR@", restrictDir)
+      : s]),
 );
 writeFileSync(outPath, JSON.stringify(merged, null, 2) + "\n");
 const kept = Object.keys(preserved);
 if (kept.length > 0) console.log(`==> Dependencias opcionales preservadas: ${kept.join(", ")}`);
-' "$REPO_ROOT/profiles/engineering/package.json" "$PROFILE_DIR/package.json" "$PROFILE_DIR/package.json" "$BUNDLE_DIR"
+' "$REPO_ROOT/profiles/engineering/package.json" "$PROFILE_DIR/package.json" "$PROFILE_DIR/package.json" "$BUNDLE_DIR" "$REPO_ROOT/bundles/tool-restrict"
 
 echo "==> Sincronizando instalación del perfil…"
 dsh plugin --profile "$PROFILE_NAME" install
@@ -133,12 +138,40 @@ else
 fi
 
 # ── 3. Agent presets (root de usuario: $DSH_HOME/.agent-presets) ────────────
+#
+# Directorio REAL con archivos enlazados, nunca un symlink de directorio.
+# `dsh-agent-presets` descubre presets con `readdir(..., { withFileTypes: true })`
+# seguido de `child.isDirectory()` (lib/index.js:403), y para un symlink
+# `Dirent.isDirectory()` es FALSE. Enlazar el directorio —como se hacía antes—
+# dejaba el preset fuera del roster en SILENCIO: install.sh lo reportaba
+# enlazado, dream-doctor lo daba por bueno y ningún agente podía usarlo.
+# Con directorio real + archivos enlazados el roster lo ve y el repo sigue
+# siendo la fuente de verdad: editar un preset no exige reinstalar.
+link_tree() {
+  local src="$1" dst="$2" entry base
+  mkdir -p "$dst"
+  for entry in "$src"/*; do
+    [ -e "$entry" ] || continue
+    base="$(basename "$entry")"
+    if [ -d "$entry" ] && [ ! -L "$entry" ]; then
+      link_tree "$entry" "$dst/$base"
+    else
+      ln -sfn "$entry" "$dst/$base"
+    fi
+  done
+}
+
 mkdir -p "$PRESETS_DIR"
 for preset_dir in "$REPO_ROOT"/agents/*/; do
   role="$(basename "$preset_dir")"
   [ -f "$preset_dir/agent.cordis.yml" ] || continue
-  ln -sfn "$preset_dir" "$PRESETS_DIR/$role"
-  echo "==> Preset '$role' enlazado en $PRESETS_DIR/$role"
+  target="$PRESETS_DIR/$role"
+  # Migración desde la instalación vieja: retira el symlink de DIRECTORIO que
+  # el roster ignora. Solo se retira un symlink; un directorio real del usuario
+  # (un preset suyo con el mismo id) jamás se toca.
+  [ -L "$target" ] && rm -f "$target"
+  link_tree "$preset_dir" "$target"
+  echo "==> Preset '$role' instalado en $target (directorio real; el roster ignora symlinks)"
 done
 
 # ── 3b. Skills (raíz de usuario por defecto: $DSH_HOME/skills) ───────────────

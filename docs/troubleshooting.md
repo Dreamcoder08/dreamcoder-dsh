@@ -26,7 +26,7 @@ resumen final es literal:
 | 1 | Binarios | `dsh`, `pnpm` y `node` presentes y en qué versión | Instalar lo que falte |
 | 2 | Perfil instalado | Manifiesto del perfil en `$DSH_HOME/profiles/engineering/` y que la composición (`dsh --dump-config`) genere config | `bash scripts/install.sh`; si la composición falla, `pnpm verify` da el detalle |
 | 3 | Política global | `~/.dsh/AGENTS.md` existe e idéntico a `policy/AGENTS.md` | Reinstalar; `install.sh` respalda el archivo previo |
-| 4 | Presets de agentes | Cada rol bajo `agents/` tiene su `agent.cordis.yml` y está enlazado en `$DSH_HOME/.agent-presets/` | `bash scripts/install.sh` (idempotente) |
+| 4 | Presets de agentes | Cada rol bajo `agents/` tiene su `agent.cordis.yml` y está instalado en `$DSH_HOME/.agent-presets/<rol>/` como **directorio real** (un symlink de directorio lo ignora el roster de DSH) | `bash scripts/install.sh` (idempotente) |
 | 5 | Skills del bundle | Las siete skills existen en `bundles/engineering/skills/` y están enlazadas en `$DSH_HOME/skills/` | Reinstalar; ver caso más abajo |
 | 6 | Memoria longitudinal (opcional) | Binario `engram` disponible y overlay Engram habilitado en la capa global (`$DSH_HOME/cordis.patch.yml`; el formato viejo solo-perfil se detecta con aviso de migración) | Informativo: es opcional (`install.sh --with-engram`) |
 | 7 | Evidencia reciente | Registros bajo `.evidence/` del repo actual | Informativo |
