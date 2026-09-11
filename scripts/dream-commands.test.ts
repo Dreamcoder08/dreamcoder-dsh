@@ -16,24 +16,23 @@ async function loadWith(ctxOverrides = {}): Promise<{
 }> {
   const registered: { name: string; description: string; handler: () => unknown }[] = []
   const effects: string[] = []
-  const ctx: Record<string, unknown> = {
-    get: (key: string) => {
-      if (key === 'commands') {
-        return {
-          register: (def: { name: string; description: string; handler: () => unknown }) => {
-            registered.push(def)
-            return () => {}
-          },
-        }
-      }
-      return undefined
+  // El plugin lee `ctx.commands` (dependencia declarada con `inject`), no
+  // `ctx.get('commands')`: el registry va como propiedad.
+  const registry = {
+    register: (def: { name: string; description: string; handler: () => unknown }) => {
+      registered.push(def)
+      return () => {}
     },
+  }
+  const ctx: Record<string, unknown> = {
+    commands: registry,
+    get: (key: string) => (key === 'commands' ? registry : undefined),
     effect: (fn: () => () => void, label: string) => {
       effects.push(label)
       const dispose = fn()
       return typeof dispose === 'function' ? dispose : () => {}
     },
-    logger: { warn: () => {} },
+    logger: { warn: () => {}, error: () => {} },
     ...ctxOverrides,
   }
   const mod = await import(PLUGIN)
@@ -42,12 +41,18 @@ async function loadWith(ctxOverrides = {}): Promise<{
 }
 
 describe('bundle host.mjs (dream-commands)', () => {
-  let plugin: { name: string; apply: (ctx: unknown) => void; default: { apply: (ctx: unknown) => void } }
+  let plugin: {
+    name: string
+    apply: (ctx: unknown) => void
+    inject?: string[]
+    default: { apply: (ctx: unknown) => void; inject?: string[] }
+  }
   before(async () => {
     plugin = (await import(PLUGIN)) as {
       name: string
       apply: (ctx: unknown) => void
-      default: { apply: (ctx: unknown) => void }
+      inject?: string[]
+      default: { apply: (ctx: unknown) => void; inject?: string[] }
     }
   })
 
@@ -57,10 +62,14 @@ describe('bundle host.mjs (dream-commands)', () => {
     assert.equal(typeof plugin.default?.apply, 'function')
   })
 
-  test('registra /dream-doctor y /dream-status dentro de ctx.effect', async () => {
+  test('registra la superficie de comandos in-session dentro de ctx.effect', async () => {
     const { registered, effects } = await loadWith()
     const names = registered.map((d) => d.name).sort()
-    assert.deepEqual(names, ['dream-doctor', 'dream-status'])
+    // Contrato de la superficie del bundle: exactamente estos cuatro comandos.
+    // `/dream-presets` monta los seis agent presets y `/dream-tools` verifica el
+    // catálogo efectivo del agente actual — las dos comprobaciones que ningún
+    // gate estático puede hacer. Sumar o quitar uno es un cambio deliberado.
+    assert.deepEqual(names, ['dream-doctor', 'dream-presets', 'dream-status', 'dream-tools'])
     for (const def of registered) {
       assert.equal(typeof def.description, 'string')
       assert.ok(def.description.length > 0)
@@ -71,14 +80,35 @@ describe('bundle host.mjs (dream-commands)', () => {
     assert.deepEqual(effects, ['dream-commands'])
   })
 
-  test('ctx sin registry no lanza (degradación silenciosa)', async () => {
-    const warned: string[] = []
+  test('declara `inject: [commands]` — el gate del defecto que dejó los comandos muertos', () => {
+    // Este es el assert que faltaba. `apply` leía `ctx.get('commands')` y salía
+    // en silencio cuando el servicio todavía no estaba provisto: los cuatro
+    // comandos nunca existieron, con la fila compuesta y el registry simulado de
+    // este mismo archivo diciendo que todo estaba bien. Los paquetes que sí
+    // registran (`@deepseek-ai/dsh-command-goal`) declaran `inject`.
+    assert.ok(Array.isArray(plugin.inject), 'el plugin debe declarar `inject`')
+    assert.ok(
+      plugin.inject.includes('commands'),
+      `inject debe incluir 'commands' (leído: ${JSON.stringify(plugin.inject)})`,
+    )
+    // El loader toma `exports.default ?? exports`, así que la dependencia tiene
+    // que estar también en el default o no llega al registro.
+    assert.deepEqual(plugin.default.inject, plugin.inject)
+  })
+
+  test('sin el servicio registra un ERROR explícito, no un silencio', async () => {
+    const errors: string[] = []
     const mod = await import(PLUGIN)
+    // Escenario inalcanzable bajo `inject`; si ocurriera, no puede pasar como
+    // "no hay nada que hacer": una capacidad documentada sin registrar es un
+    // error, no una degradación.
     mod.default.apply({
+      commands: undefined,
       get: () => undefined,
-      logger: { warn: (m: string) => warned.push(m) },
+      logger: { error: (m: string) => errors.push(m), warn: () => {} },
     })
-    assert.deepEqual(warned, [])
+    assert.equal(errors.length, 1, `esperaba un error reportado, recibí: ${JSON.stringify(errors)}`)
+    assert.match(errors[0] ?? '', /NO se registraron/)
   })
 
   test('/dream-status handler devuelve kind success con texto de métricas', { timeout: 120000 }, async () => {
