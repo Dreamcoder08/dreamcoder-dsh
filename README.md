@@ -183,6 +183,15 @@ Verify independently → Review → Publish evidence**. Ninguna etapa se omite e
 silencio: si no aporta (p. ej. Clarify en un typo), se declara omitida en una
 línea del reporte.
 
+Ese pipeline vive en la persona del bundle
+(`bundles/engineering/cordis.patch.yml`) y el agente lo sigue **por contrato**,
+no por imposición del host. Lo que sí es mecánico es el orden de etapas dentro
+de un workflow concreto: `scripts/sdd-gate.ts` rechaza avanzar fuera de orden en
+`mini-sdd` y `full-sdd`, y `contracts/*.json` declara esas etapas con sus
+criterios. En P0/P1 (`direct`) el pipeline es contractual. El test
+`scripts/claims-vs-artifacts.test.ts` ata la lista al artefacto: si una etapa se
+renombra, se reordena o desaparece, la suite falla.
+
 El objetivo no es ceremonia: es evitar el caos accidental. La clasificación de
 riesgo decide cuánto proceso aplica:
 
@@ -247,17 +256,51 @@ Referencia completa con contratos de activación:
 
 ## Agent presets
 
-Seis roles con permisos y responsabilidades separados — la separación
-implementa / verifica es estructural, no disciplinaria:
+Seis roles con superficies de tools distintas: cada preset monta su propio
+catálogo y algunos catálogos son disjuntos por construcción —`explorer` y
+`architect` no montan shell; solo `implementer` monta `tool-jobs` y el pruner de
+compaction; `reviewer` no monta web ni todo—. Esa diferencia es estructural y no
+depende de que el modelo recuerde su rol.
 
-| Preset | Responsabilidad | Límite duro |
-|---|---|---|
-| `explorer` | Exploración de solo lectura con hallazgos citados | Sin shell ni escritura |
-| `architect` | Diseño y planes decision-completos en plan mode | Sin mutación del repo |
-| `implementer` | Único rol que implementa cambios | Jamás se autoaprueba |
-| `tester` | Verificación independiente: suites y reproducción de fallos | Solo escribe tests, nunca el fix |
-| `reviewer` | Revisión 4R con contexto fresco | Veredicto APPROVED / CHANGES_REQUIRED |
-| `security` | Auditoría ofensiva/defensiva del cambio | Veredicto PASS / FAIL con evidencia |
+Ahora bien, **estructural no significa aislado**: `reviewer`, `security` y
+`tester` sí montan `tool-fs` y shell, así que podrían mutar el repo si se lo
+propusieran. La separación "quien implementa no verifica" es una regla del
+workflow y del roster (roles distintos, contexto fresco), no una barrera del
+catálogo. Los límites que no están mecanizados se declaran como contractuales en
+la columna "Naturaleza"; ninguno se presenta como más de lo que es.
+
+Los límites de **no mutación** de `explorer` y `architect` sí tienen mecanismo:
+declaran una fila `tool-restrict` (paquete `bundles/tool-restrict/`) que enmascara
+`write`/`edit` con `ctx.tools.restrict` en el scope del agente al crearse. Hace
+falta porque `@deepseek-ai/dsh-tool-fs` expone `read`/`read_image`/`write`/`edit`
+en un solo paquete, sin opción de config para desactivar la mitad mutadora:
+montarlo sin máscara daba escritura a un rol que se declara de solo lectura.
+Efecto lateral: ocultar esas tools retira su coste de schema del prompt del rol.
+
+**Estado de verificación de esa máscara** (se declara, no se presume):
+
+- ✔ verificado: `install.sh` instala el paquete y el perfil lo resuelve;
+- ✔ verificado: los seis presets **montan** de verdad
+  (`agentPresets.standingKeyFor`, el mismo montaje que hace el arranque de sesión);
+- ✘ **no verificado todavía**: que en una sesión real de `explorer`/`architect`
+  `write` y `edit` estén ausentes del catálogo efectivo. El montaje se valida sin
+  agente, así que el evento `agent/created` —donde se aplica la máscara— no se
+  dispara en esa comprobación. La confirmación es abrir una sesión en cualquiera
+  de esos presets y verificar que `write`/`edit` no aparecen; hasta entonces el
+  límite es "declarado y montado", no "observado".
+
+El test `scripts/preset-restrictions.test.ts` cruza esta tabla contra las
+composiciones: si un rol declara no-mutación y su composición no la garantiza, la
+suite falla.
+
+| Preset | Responsabilidad | Límite duro | Naturaleza |
+|---|---|---|---|
+| `explorer` | Exploración de solo lectura con hallazgos citados | Sin shell ni escritura | mecánico |
+| `architect` | Diseño y planes decision-completos en plan mode | Sin mutación del repo | mecánico |
+| `implementer` | Único rol que implementa cambios | Jamás se autoaprueba | contractual |
+| `tester` | Verificación independiente: suites y reproducción de fallos | Solo escribe tests, nunca el fix | contractual |
+| `reviewer` | Revisión 4R con contexto fresco | Veredicto APPROVED / CHANGES_REQUIRED | contractual |
+| `security` | Auditoría ofensiva/defensiva del cambio | Veredicto PASS / FAIL con evidencia | contractual |
 
 ## Comandos
 
@@ -266,7 +309,7 @@ implementa / verifica es estructural, no disciplinaria:
 | `bash scripts/install.sh` | Instalación idempotente del perfil, política y presets (preserva dependencias opcionales ya instaladas) |
 | `bash scripts/install.sh --with-engram` | Ídem + overlay de memoria Engram en la capa global (todos los perfiles; auto-migra formato viejo) |
 | `bash scripts/install.sh --with-hooks` | Ídem + hook pre-commit anti-secretos y hook pre-push (suite completa antes de publicar) |
-| `/dream-doctor` · `/dream-status` | Comandos in-session de la GUI (tras reiniciar dsh): corren doctor y métricas sin salir de la sesión |
+| `/dream-doctor` · `/dream-status` · `/dream-presets` · `/dream-tools` | Comandos in-session de la GUI (tras reiniciar dsh): corren doctor y métricas sin salir de la sesión. `/dream-presets` **monta los seis agent presets** con el mismo camino que el arranque de sesión y reporta cuál falla; `/dream-tools` lista el catálogo efectivo de tools del agente actual y **verifica el límite duro de su rol** (p. ej. que `explorer` no tenga `write`/`edit`). Son las dos comprobaciones que ningún gate estático puede hacer: `verify-presets` y el doctor no montan, y el montaje no crea agente. |
 | `bash scripts/dream-doctor.sh` | Salud de la instalación en 13 chequeos (seguridad, vanguardia y procedencia SHA-256) |
 | `pnpm verify` | Compatibilidad contra DSH pineado + validación de presets + contratos |
 | `pnpm bench` | Mini-bench MODO DRIVEN: ejecuta los journeys de `bench/` y deja recibo en `.evidence/bench-latest.json` · `--list` muestra el corpus sin ejecutar · `--json` emite un objeto JSON machine-readable por stdout (CI/tooling) · `--only j1,j2` subset |
@@ -290,7 +333,13 @@ solo texto:
   `push --force`, drops de base de datos…) y las rutas sensibles
   (`~/.ssh/`, `.env`, claves privadas).
 - **Hook pre-commit** (`install.sh --with-hooks`) impide commitear rutas
-  sensibles y claves privadas en el diff staged.
+  sensibles y claves privadas en el diff staged. **Alcance real, sin
+  ambigüedad**: los hooks se instalan en `.git/hooks` de *este* repositorio
+  (el bundle), no en los repos del usuario. Protegen los commits del bundle; no
+  convierten en segura la máquina. Para cubrir otro repo hay que correr
+  `--with-hooks` desde él (el hook resuelve su raíz con
+  `git rev-parse --show-toplevel`), y `dream-doctor` reporta el hook de este
+  repo, no el de tus proyectos.
 - **Bypass auditable**: el único escape es `DC_SECURITY_BYPASS="quién aprobó y
   cuándo"`, registrado en `.evidence/security-gate-audit.jsonl`; si la traza no
   puede escribirse, el bypass se deniega (fail-closed).
@@ -382,6 +431,29 @@ Pendiente conocido:
    verificable y reversible.
 6. **Autonomía es control verificado**, no ausencia de supervisión.
 
+## Qué se afirma y qué no
+
+Un README que solo enumera capacidades enseña a no creerle a ninguno de sus
+enunciados. Esta tabla declara el **alcance verificado** de cada promesa y, en la
+tercera columna, lo que este repositorio **no** afirma. Cuando algo no está
+verificado, se dice acá y en el documento de la capacidad — no se deja implícito.
+
+| Capacidad | Verificado | NO se afirma |
+|---|---|---|
+| Pipeline de diez etapas | La persona del bundle enumera las diez etapas en orden, y `scripts/claims-vs-artifacts.test.ts` lo ata al artefacto | Cumplimiento mecánico en P0/P1: ahí el pipeline es contractual. En P2/P3 el orden sí lo impone `sdd-gate` |
+| Instalación | E2E con `dsh` simulado (layout, idempotencia, dependencias preservadas) y una instalación real: roster con los 6 presets, doctor en 0, manifiesto sin drift | Que `--with-engram`, `--with-hooks` y `--with-hook-bridge` funcionen: el E2E **no** los ejerce (requieren binarios y un checkout de DSH) |
+| Seis agent presets | Los seis aparecen en el roster con `trust: user` y **montan** con el mismo camino que el arranque de sesión (`/dream-presets`) | Que una sesión real de cada rol produzca exactamente el catálogo esperado: eso se comprueba con `/dream-tools`, no automáticamente |
+| Límites duros de `explorer` y `architect` | Su composición declara la máscara `deny: [write, edit]`, el paquete resuelve y el preset monta | Que el catálogo efectivo en sesión esté libre de `write`/`edit`: la máscara se aplica en `agent/created`, que el montaje no dispara, así que **depende de que el agente se una al preset en ese momento**. Observado: un agente creado por un camino que no hace ese join queda sin catálogo de rol — y sin máscara, aunque `write`/`edit` tampoco aparezcan (por ausencia de `tool-fs`, no por la máscara). Se verifica con `/dream-tools` dentro de una sesión de esos roles, que ahora reporta error si el agente no se unió a ningún preset |
+| Separación implementar/verificar | Los catálogos difieren por rol (sin shell en explorer/architect; `tool-jobs` solo en implementer) | Aislamiento: `reviewer`, `security` y `tester` montan `tool-fs` y shell, así que **podrían** mutar el repo. Es regla de workflow y de roster |
+| `tester` escribe tests, no el fix | Es política declarada en la tabla de presets | Enforcement por ruta: `ctx.tools.restrict` filtra por nombre de tool, no por path |
+| Hooks de seguridad | Impiden commitear rutas sensibles y claves en el diff staged | Que protejan tus repos: se instalan en `.git/hooks` de **este** repo |
+| Seguridad mecánica P5 | `security-gate` como CLI y en hooks de git (`git reset --hard` bloqueado en CI) | Enforcement *dentro* de la sesión, salvo el puente de hooks Claude Code, que está declarado bloqueado upstream |
+| Memoria longitudinal | La skill `memory-gate` gatea qué se persiste | Persistencia sin backend: sin el binario `engram` se opera sin memoria y se declara, nunca se simula |
+| Bench driven | 8 jornadas; **6 corren en CI** sin host | j5 y j6 en CI: necesitan `dsh` y una instalación real (`pnpm bench` local) |
+| Suite de tests | Corre en CI con un piso de 150 tests, para que un glob que deja de casar ficheros no se vea como verde | Cobertura del host real: montaje, doctor y composición se validan en la máquina, no en el runner |
+| Comandos in-session (`/dream-*`) | Los cuatro figuran registrados en el host vivo, y `/dream-presets` monta los seis presets | Que un cambio en `host.mjs` se vea sin reiniciar: el plugin se carga con el perfil. Un servicio que el plugin consuma tiene que estar en su `inject`, o el comando no existe y el fallo es invisible |
+| Formato del código | Nada | Que exista un estilo uniforme: no hay formatter ni lint cableados (la config de Biome se retiró por muerta: nadie la ejecutaba) |
+
 ## Desarrollo
 
 ```bash
@@ -406,3 +478,9 @@ reúne los fallos conocidos y sus salidas exactas.
 ## Licencia
 
 [Apache-2.0](LICENSE).
+
+La procedencia y atribución de cada skill —qué es original de este repo y qué se
+adaptó del ecosistema Gentle-AI— está declarada en
+[`docs/provenance.md`](docs/provenance.md), con la evidencia del análisis y los
+puntos que quedan por confirmar. El gate `scripts/provenance.test.ts` impide que
+una skill nueva entre sin clasificar.

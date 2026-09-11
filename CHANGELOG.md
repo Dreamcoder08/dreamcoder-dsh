@@ -7,6 +7,166 @@ y el versionado respeta [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Fixed (ronda de calidad 5 — un falso positivo propio, cazado antes de creerlo)
+
+- **`/dream-tools` ya no puede dar un verde falso.** Ante un agente que **no se
+  unió a ningún preset**, reportaba `límite duro declarado: ninguno para este
+  rol`, que se lee como "todo bien" y en realidad significa "su catálogo no es
+  el de ningún rol". Ahora devuelve **error** y lo dice: el catálogo no
+  corresponde a ningún rol, no hay límite que verificar, y si persiste el
+  montaje está roto. Se descubrió intentando verificar la máscara con un agente
+  `explorer` desechable creado desde una sonda: `agents.create` con
+  `meta.agentPreset` **no** realiza el join, el agente quedó con 24 tools (MCP +
+  la sonda) y `write`/`edit` ausentes — ausentes por falta de `tool-fs`, no por
+  la máscara. El veredicto "MÁSCARA OK" era un falso positivo; se detectó porque
+  la sonda imprimía `composedPreset`, que devolvió `(ninguno)`.
+  Consecuencia documentada en el README y en `docs/architecture.md`: la máscara
+  se aplica en `agent/created`, así que **depende de que el agente se una al
+  preset en ese momento**; un agente que no hace ese join no la recibe. La
+  verificación e2e en una sesión real de `explorer` sigue pendiente.
+
+### Fixed (ronda de calidad 4 — una capacidad documentada que nunca existió)
+
+- **Los comandos in-session nunca se registraron.** `/dream-doctor`,
+  `/dream-status`, `/dream-presets` y `/dream-tools` estaban documentados en el
+  README y "verificados" por un test con un registry simulado, pero **ninguno
+  existía en una sesión real**. Causa: `host.mjs` leía el servicio con
+  `ctx.get('commands')` en lugar de declararlo como dependencia. En el arranque
+  del perfil el servicio todavía no está activo, y `ctx.get` **no devuelve
+  servicios cuyo fiber no está activo**; el plugin se retiraba en silencio
+  (`if (commands === undefined) return`, comentado como "degradación
+  silenciosa"). Los paquetes que sí registran comandos lo declaran:
+  `@deepseek-ai/dsh-command-goal` tiene `inject = ["commands", "goals"]`.
+  Ahora `host.mjs` declara `inject: ['commands']` (en el export nombrado y en el
+  default, que es el que toma el loader), lee `ctx.commands`, y si el servicio
+  faltara lo reporta como **ERROR** en vez de callarse.
+  Diagnóstico sobre el host vivo: la fila `dream-commands` está compuesta (dump
+  línea 624), el registry acepta registros —un comando de control de una sonda
+  **sí** apareció en la lista— y aun así los cuatro `dream-*` figuraban ausentes.
+  El gate nuevo es `scripts/dream-commands.test.ts`: o declara `inject`, o la
+  suite falla.
+  **Verificado en el host vivo tras el reinicio**: `commands.list(agent)`
+  devuelve `dream-doctor`, `dream-presets`, `dream-status` y `dream-tools`, y
+  `standingKeyFor` monta los seis presets. Cadena completa: causa → fix →
+  efecto observado en el runtime.
+
+### Added (ronda de calidad 3 — lo que Gentleman haría)
+
+- **`/dream-tools`: verificación del límite duro en el agente vivo.** La máscara
+  de rol se aplica en `agent/created`, así que ningún gate estático —ni el
+  montaje, que ocurre "sin el agente"— podía ver su efecto. El comando lee
+  `tools.schemas(agent)` (el propio `Agent` es el `ScopeKey`, como en
+  `dsh-tool-subagent`) y compara lo visible contra el límite declarado del rol:
+  si `write`/`edit` aparecen en `explorer`, lo reporta como fuga. Cierra la única
+  afirmación que quedaba sin forma de comprobarse.
+  **Verificado por el operador tras el reinicio**: `/dream-presets` reporta los
+  seis presets montando, y `/dream-tools` responde leyendo el scope del agente
+  real (`preset: cordis`, 57 tools visibles, `límite duro declarado: ninguno
+  para este rol` — correcto: el preset de autoría no declara límite). Falta
+  únicamente correrlo dentro de una sesión de `explorer`/`architect`, que es
+  donde el límite existe.
+- **Tabla "Qué se afirma y qué no" en el README**: alcance verificado por
+  capacidad y, explícitamente, lo que este repositorio NO afirma (enforcement por
+  ruta, hooks sobre repos ajenos, las jornadas de bench que CI no corre, la
+  ausencia de formatter). Un README que solo enumera capacidades enseña a no
+  creerle a ninguna.
+- **`docs/provenance.md` + gate de clasificación**: la autoría de cada skill
+  queda declarada con su evidencia. El análisis comprobó que
+  `evidence-ledger`, `review-4r`, `tdd-evidence` y `workflow-router` declaran
+  `author: gentleman-programming` sin que **ninguno** de los dos upstreams
+  (gentle-pi, historial incluido, y gentle-ai) las contenga: quedan marcadas
+  `por-confirmar` en vez de esconderse, y el frontmatter no se toca porque
+  cambiarlo afirmaría otra autoría igual de indemostrada.
+  `scripts/provenance.test.ts` impide que una skill nueva entre sin clasificar.
+
+### Removed
+
+- **`biome.json`**: configuración muerta. No había script de lint ni de formato,
+  no era dependencia y no aparecía en CI ni en docs — una promesa de estilo que
+  nadie ejecutaba. El proyecto de referencia tampoco tiene lint ni typecheck, y
+  lo declara: sus gates verifican deriva y bytes, no estilo.
+
+### Added (ronda de calidad 2 — gates que no pueden quedar vacíos ni mentir)
+
+- **`/dream-presets`: verificación de montaje bajo demanda.** Los tres defectos
+  que impedían montar los seis presets convivieron con un "✔" en
+  `verify-presets` y en el doctor, porque **ninguno de los dos monta**. El
+  comando in-session `host.mjs` monta los seis roles con el mismo camino que el
+  arranque de una sesión (`agentPresets.standingKeyFor`) y reporta cuál falla,
+  con su motivo. Ya no hace falta una sonda dinámica artesanal para saber si un
+  preset es usable. Requiere reiniciar `dsh` para registrarse.
+- **Cobertura del bench declarada y verificada en las dos direcciones.**
+  `bench/corpus.ts` ahora exige `requires: 'host' | 'none'` en cada jornada, sin
+  default: omitirlo es un error de tipos, no una suposición. Y
+  `scripts/bench-coverage.test.ts` compara la lista `--only` del workflow con el
+  conjunto sin dependencia de host, de modo que una jornada nueva no pueda
+  quedar fuera de CI en silencio ni una dependiente del host colarse hasta
+  romper el runner. Antes, la exclusión de j4–j6 existía solo como lista
+  hardcodeada más un comentario.
+- **`j4` corregido y sumado a CI (5 → 6 de 8 jornadas).** Su expectativa de
+  exit 3 exigía la frase `sin datos`, que emite **una sola** de las tres rutas de
+  exit 3: en un clon nuevo la que se dispara es `sin sesiones`, así que
+  `pnpm bench` —el gate local documentado— quedaba rojo por una razón ambiental.
+  Ahora afirma el vocabulario del contrato (`limitación declarada`), y el mensaje
+  de la ruta "la sesión no existe" se alineó con las otras dos, que ya lo usaban.
+
+### Fixed (ronda de calidad — defectos que los gates no veían)
+
+- **Los 6 agent presets no existían para el roster.** `install.sh` los
+  instalaba como symlink de *directorio*, y `dsh-agent-presets` descubre con
+  `readdir(…, { withFileTypes: true })` + `child.isDirectory()`
+  (`lib/index.js:403`), que es `false` para un symlink: los 6 quedaban fuera del
+  roster **en silencio**, con `install.sh`, `dream-doctor` y `verify-presets`
+  reportándolos instalados. Ahora se crea un directorio real con archivos
+  enlazados (`link_tree`), de modo que el roster los ve y el repo sigue siendo
+  la fuente de verdad. Verificado en el host vivo: los 6 aparecen con
+  `trust: user`.
+- **Ningún preset podía montar.** Tres campos requeridos por los schemas de DSH
+  faltaban o estaban mal nombrados: `persona` exige `prefix` y usaba `text`
+  (campo inexistente), `tool-todo` exige `allowParallelInProgress` y
+  `plan-mode` un `section` no vacío. Verificado con montaje real
+  (`agentPresets.standingKeyFor`): 6/6 montan.
+- **Falso drift en el manifiesto de procedencia**: en un repo sin commits,
+  `git rev-parse HEAD` imprime `HEAD` y *además* falla, así que la captura
+  quedaba multilínea (`"HEAD\nunknown"`); la línea huérfana hacía que
+  `sha256sum --check` la marcara como mal formada y `verify` denunciaba drift
+  sobre una instalación intacta. Esto tenía la suite en rojo (146 tests, 1
+  fallo).
+- **`dream-doctor` daba por bueno un preset instalado como symlink**, que es
+  exactamente la instalación inservible; ahora exige directorio real.
+
+### Added (ronda de calidad — verificación)
+
+- `bundles/tool-restrict/`: paquete `@dreamcoder/dsh-tool-restrict` que aplica
+  `ctx.tools.restrict({ deny })` en el scope del agente (`agent/created`,
+  guardado por `composedPreset`). Cierra la afirmación falsa de `explorer` y
+  `architect`: ambos montaban `dsh-tool-fs`, que registra `write`/`edit` sin
+  opción de config para desactivarlos, mientras su persona decía "no tienes
+  herramientas de escritura". **Estado declarado**: declarada y montada,
+  verificación end-to-end del catálogo efectivo pendiente de una sesión real.
+- `scripts/install-e2e.test.ts`: E2E de `install.sh` con `dsh` simulado (layout,
+  idempotencia sin residuos, preservación de dependencias opcionales, fallo
+  claro sin `dsh`, flag inválido). El camino primario del usuario no tenía
+  ningún test.
+- `scripts/preset-config.test.ts`: lint de los campos que los schemas exigen, la
+  alarma temprana en CI de los tres defectos de montaje.
+- `scripts/preset-restrictions.test.ts`: cruza la tabla del README contra las
+  composiciones; un rol con límite de no-mutación sin máscara rompe la suite.
+- `scripts/skill-contract.test.ts` + contrato declarado en
+  `docs/skills-reference.md`: identidad, trigger en una línea, atribución,
+  `Activation Contract`/`Output Contract`, sin H1 en el cuerpo, presupuesto de
+  150–1000 palabras y skill documentada. El proyecto de referencia declara su
+  guía de estilo pero no la hace cumplir; acá es mecánico.
+- `scripts/claims-vs-artifacts.test.ts`: ata el pipeline de diez etapas al
+  artefacto que lo declara y la versión del repo a su entrada de changelog.
+- CI endurecido: acciones fijadas por SHA (con `.github/dependabot.yml` para
+  mantenerlas frescas), guard anti "verde porque nada corrió" (`node --test`
+  sale 0 e imprime `# fail 0` si el glob no casa nada — comprobado) con piso de
+  150 tests, y `verify-contracts` como gate host-free explícito.
+- `docs/reference/gentle-pi-quality-bar.md`: análisis del referente
+  (gentle-pi 2.5.0) del que salió este backlog, con los mecanismos
+  transferibles y su coste de portabilidad.
+
 ### Added (documentación)
 
 - **Suite documental deep-dive**: `docs/architecture.md` ampliado (145→400
