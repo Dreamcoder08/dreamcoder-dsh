@@ -190,8 +190,12 @@ gate avisa por stderr (`⚠ BYPASS auditado (…)`) y permite el comando.
 bash scripts/install.sh --with-hooks
 ```
 
-Instala dos hooks en `.git/hooks/` del repo (idempotente; si existe un hook
-ajeno —husky, gitleaks— lo respalda con timestamp antes de reemplazarlo):
+Instala dos hooks en `.git/hooks/` de **este** repo —el bundle—, no en los
+repositorios del usuario: protegen los commits del bundle, no convierten en
+segura la máquina. (Idempotente; si existe un hook ajeno —husky, gitleaks— lo
+respalda con timestamp antes de reemplazarlo. Para cubrir otro repo, corré
+`--with-hooks` desde él: el hook resuelve su raíz con
+`git rev-parse --show-toplevel`.)
 
 **pre-commit** — anti-secretos. Cuerpo generado:
 

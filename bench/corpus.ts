@@ -33,6 +33,20 @@ export interface Journey {
   /** POR QUÉ vale la expectativa: decisión ratificada o sección de política. */
   why: string
   axis: BenchAxis
+  /**
+   * Dependencia de entorno, DECLARADA y sin default: omitirla es un error de
+   * tipos, no una suposición silenciosa.
+   *
+   * - `none`: corre con este repo solo (sin `dsh` ni instalación).
+   * - `host`: necesita un DSH real o una instalación local, así que queda fuera
+   *   de CI a propósito.
+   *
+   * El contrato es que la lista `--only` del workflow sea EXACTAMENTE el
+   * conjunto `none`; lo verifica `scripts/bench-coverage.test.ts`. Sin ese gate,
+   * una jornada nueva podía quedar excluida de CI en silencio, o una
+   * dependiente del host colarse y romper el runner.
+   */
+  requires: 'host' | 'none'
   steps: BenchStep[]
 }
 
@@ -44,6 +58,7 @@ export const journeys: readonly Journey[] = [
     title: 'security-gate bloquea P5 y permite comandos inocuos',
     why: 'policy/AGENTS.md §3: operaciones P5 requieren aprobación humana; el gate es el enforcement mecánico de la deny-list.',
     axis: 'gates',
+    requires: 'none',
     steps: [
       {
         name: 'classify marca rm -rf como P5 bloqueado',
@@ -67,6 +82,7 @@ export const journeys: readonly Journey[] = [
     title: 'sdd-gate exige orden estricto de etapas del workflow',
     why: 'Contrato contracts/direct.json: orden estricto understand→change→verify→summarize; saltarse una etapa viola el gate (mini-sdd §8 Verify independently).',
     axis: 'gates',
+    requires: 'none',
     steps: [
       {
         // Id único por corrida (el runner inyecta DSH_BENCH_RUN_ID): dos
@@ -96,6 +112,7 @@ export const journeys: readonly Journey[] = [
     title: 'manifiesto de procedencia detecta drift post-instalación',
     why: 'Fase C (feat 9eb7de3): dream-manifest.sh verify debe salir 0 limpio, 1 con drift y avisar por stderr — sin drift silencioso.',
     axis: 'evidence',
+    requires: 'none',
     steps: [
       {
         name: 'generate + verify limpio sobre un DSH_HOME falso',
@@ -127,6 +144,7 @@ export const journeys: readonly Journey[] = [
     title: 'context-governor emite veredicto del vocabulario cerrado',
     why: 'policy/AGENTS.md §7: la presión se mide, no se intuye; exit codes exclusivos 0 ok / 1 warning / 2 critical / 3 sin datos.',
     axis: 'observability',
+    requires: 'none',
     steps: [
       {
         // Contrato REAL del governor (scripts/context-governor.ts): los
@@ -139,7 +157,13 @@ export const journeys: readonly Journey[] = [
           'out=$(node scripts/context-governor.ts 2>&1); rc=$?; echo "$out"; ' +
           'case $rc in ' +
           '  0|1|2) echo "$out" | grep -Eq "context:(ok|warning|critical)" ;; ' +
-          '  3) echo "$out" | grep -q "sin datos" ;; ' +
+          // Exit 3 = "sin datos de uso — limitación declarada, nada simulado"
+          // (policy §7). Se afirma por el VOCABULARIO DEL CONTRATO, no por una
+          // de las tres frases que emiten las rutas: exigir "sin datos" hacía
+          // fallar el journey en un clon nuevo, donde la ruta que se dispara es
+          // la de "sin sesiones" y el gate local `pnpm bench` quedaba rojo por
+          // una razón ambiental.
+          '  3) echo "$out" | grep -q "limitación declarada" ;; ' +
           '  *) false ;; ' +
           'esac',
         expectExit: 0,
@@ -151,6 +175,7 @@ export const journeys: readonly Journey[] = [
     title: 'dream-doctor declara la instalación saludable',
     why: 'M10 observabilidad: el doctor agrega 13 chequeos con exit agregado; es el gate canónico de salud post-instalación.',
     axis: 'composition',
+    requires: 'host',
     steps: [
       {
         name: 'doctor completa con exit 0',
@@ -165,6 +190,7 @@ export const journeys: readonly Journey[] = [
     title: 'el perfil compuesto lleva el guard repeat-tool-reminder afinado',
     why: 'commit 1e4cc56: el override del bundle debe verse en la CONFIGURACIÓN COMPUESTA real (dsh --dump-config), no solo en el YAML fuente — componer no es ejecutar.',
     axis: 'composition',
+    requires: 'host',
     steps: [
       {
         name: 'dump-config contiene exclude ask_user_question del override',
@@ -179,6 +205,7 @@ export const journeys: readonly Journey[] = [
     title: 'specs canónicas SDD: roundtrip new→sync→drift→archive',
     why: 'M13: la spec canónica debe alinearse con su contrato ratificado; una spec inválida NO se archiva (fail-closed) y la archivada lleva SHA-256 en el índice.',
     axis: 'evidence',
+    requires: 'none',
     steps: [
       {
         name: 'new + sync en verde sobre specs-dir temporal',
@@ -214,6 +241,7 @@ export const journeys: readonly Journey[] = [
     title: 'cc-hook-guard decide bloquear/permitir por exit code',
     why: 'M14: el enforcement mecánico debe vivir DENTRO de cada sesión (PreToolUse del puente Claude Code), no solo en pre-commit — la decisión la toma security-gate, no el modelo.',
     axis: 'gates',
+    requires: 'none',
     steps: [
       {
         name: 'P5 vía Bash → exit 2 con feedback accionable',

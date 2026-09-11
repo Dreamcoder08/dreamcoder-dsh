@@ -20,6 +20,7 @@ describe('corpus declarations', () => {
         title: 'a',
         why: 'w',
         axis: 'gates' as const,
+        requires: 'none' as const,
         steps: [{ name: 's1', shell: 'true' }],
       },
       {
@@ -27,6 +28,7 @@ describe('corpus declarations', () => {
         title: 'b',
         why: 'w',
         axis: 'no-existe' as never, // eje fuera del vocabulario
+        requires: 'none' as const,
         steps: [], // journey muerto
       },
       {
@@ -34,6 +36,7 @@ describe('corpus declarations', () => {
         title: 'c',
         why: '',
         axis: 'gates' as const,
+        requires: 'none' as const,
         steps: [{ name: 's2', shell: '   ' }], // step sin comando
       },
     ]
@@ -181,6 +184,7 @@ describe('runner evaluation logic', () => {
       title: 'fake',
       why: 'unit fixture',
       axis: 'gates',
+      requires: 'none',
       steps: [
         { name: 'pasa', shell: 'true' },
         { name: 'falla', shell: 'exit 7', expectExit: 0 },

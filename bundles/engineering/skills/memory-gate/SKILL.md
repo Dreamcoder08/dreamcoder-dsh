@@ -41,6 +41,15 @@ Secretos o contenido de rutas sensibles (`~/.ssh`, `.env*`, credenciales): jamá
 1. Al iniciar: una consulta de recuperación acotada al dominio de la tarea (no browsing general).
 2. Inyecta en cada prompt de subagente solo los hechos pertinentes, citando su origen.
 3. Al cerrar: aplica este gate; si algo pasa, escríbelo con estructura `contexto → decisión/descubrimiento → evidencia → implicación`.
-4. Declara en tu reporte final una línea: `Memoria: N entradas persistidas, M recuperadas` (o `0, 0`).
 
-Si las tools `mcp__engram__*` no están disponibles, decláralo una vez y opera sin memoria longitudinal; no simules escrituras.
+## Output Contract
+
+Cierra con una línea verificable, no con una narración:
+
+`Memoria: N entradas persistidas, M recuperadas`
+
+- `N` y `M` son conteos reales; sin actividad usa `0, 0` — la línea no se omite.
+- Nombra cada entrada persistida por su clave o título, para que sea auditable.
+- Si las tools `mcp__engram__*` no están disponibles, decláralo una vez y cierra con
+  `Memoria: sin backend — 0, 0`: la tarea continúa sin memoria longitudinal y
+  **nunca** se simula una escritura.

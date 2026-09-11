@@ -237,7 +237,14 @@ if (sessionName !== undefined) {
     die("--session solo acepta [A-Za-z0-9._-]; no rutas")
   }
   if (!existsSync(join(sessionsDir, sessionName))) {
-    console.error(`ERROR: la sesión '${sessionName}' no existe bajo ${sessionsDir}`)
+    // Mismo vocabulario que las otras dos rutas de exit 3: el contrato de
+    // policy/AGENTS.md §7 promete "sin datos de uso — limitación declarada,
+    // nada simulado", y un consumidor que discrimina por mensaje (el journey
+    // j4 del bench, por ejemplo) no debe tener que adivinar cuál ruta se
+    // disparó. El código 3 ya lo dice; el texto ahora lo confirma.
+    console.error(
+      `ERROR: la sesión '${sessionName}' no existe bajo ${sessionsDir} — limitación declarada, nada simulado`,
+    )
     process.exit(3)
   }
 } else {

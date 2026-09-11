@@ -12,6 +12,29 @@ que enlaza cada carpeta por symlink en `$DSH_HOME/skills` —la raíz que escane
 el filesystem de skills de DSH—, sin rutas absolutas en el patch; las flags
 `--with-engram` y `--with-hooks` agregan el overlay Engram y el hook pre-commit.
 
+## Contrato de estructura
+
+Una skill es contexto: se carga en la sesión donde aplica y compite con el código
+y la tarea por el presupuesto de `policy/AGENTS.md` §7. Por eso su forma es un
+contrato verificable, no una convención de estilo. `scripts/skill-contract.test.ts`
+lo hace cumplir en CI —declararlo sin comprobarlo es exactamente lo que este
+repositorio evita—:
+
+| Regla | Qué exige | Por qué |
+|---|---|---|
+| Identidad | `name` en kebab-case, igual al nombre del directorio | El directorio es el id con el que se instala y se cita |
+| Trigger | `description` en **una** línea física, entre comillas, empezando por `Trigger:` | El índice de skills indexa la descripción como línea única; un bloque plegado lo rompe |
+| Atribución | `license`, `metadata.author` (lista admitida) y `metadata.version` | Procedencia auditable; el lint falla ante un autor inesperado |
+| Carga y salida | Exactamente un `## Activation Contract` y un `## Output Contract` | Cuándo se activa y qué devuelve: sin esos dos, la skill es prosa suelta |
+| Sin título H1 en el cuerpo | La identidad vive en el frontmatter | Un H1 duplicado crea una segunda fuente de nombre |
+| Presupuesto | Entre 150 y 1000 palabras (objetivo 180–450, recomendado ≤700) | Una skill larga desplaza al código en la ventana del modelo |
+| Documentación | La skill aparece nombrada en este documento | Una skill nueva no debe quedar indocumentada |
+
+Las secciones de dominio (`Hard Rules`, `Decision Gates`, `Execution Steps`,
+`References`, tablas propias) son libres: el contrato fija el marco, no el
+contenido. El lint ignora lo que esté dentro de bloques de código cercados, así
+que un `#` que sea comentario de shell no cuenta como título.
+
 ## Índice
 
 | Skill | Trigger (frontmatter) | Garantía central | Script compañero |
