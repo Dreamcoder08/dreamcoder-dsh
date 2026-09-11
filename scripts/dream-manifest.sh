@@ -42,7 +42,14 @@ case "$CMD" in
     FILES=( "AGENTS.md" "profiles/$PROFILE/package.json" "profiles/$PROFILE/cordis.patch.yml" )
     LINES=()
     LINES+=("# Dreamcoder DSH — manifiesto de procedencia (generado por scripts/install.sh)")
-    COMMIT="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo unknown)"
+    # `rev-parse HEAD` en un repo SIN commits imprime "HEAD" por stdout Y falla:
+    # con `|| echo unknown` la captura quedaba multilínea ("HEAD\nunknown") y
+    # partía la cabecera. La línea huérfana resultante hacía que
+    # `sha256sum --check` la marcara como "improperly formatted", así que verify
+    # reportaba drift falso sobre una instalación intacta. `--verify` falla con
+    # stdout vacío (sin commits, repo ausente) y el saneo deja UNA sola línea.
+    COMMIT="$( { git -C "$REPO_ROOT" rev-parse --verify HEAD 2>/dev/null || true; } | head -n 1)"
+    [ -n "$COMMIT" ] || COMMIT="unknown"
     LINES+=("# repo-commit: $COMMIT")
     LINES+=("# generated-at: $(date -u +%Y-%m-%dT%H:%M:%SZ)")
     MISSING=0

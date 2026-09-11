@@ -29,6 +29,12 @@ const makeFixture = (): Fixture => {
   const repoRoot = join(root, 'repo')
   mkdirSync(join(dshHome, 'profiles', 'engineering'), { recursive: true })
   mkdirSync(join(repoRoot, 'agents', 'explorer'), { recursive: true })
+  // Hermeticidad: `git -C <dir>` asciende por los directorios padre, así que sin
+  // este repo propio la cabecera `repo-commit` dependía de si algún ancestro de
+  // TMPDIR resultaba ser un repositorio en la máquina de quien corre la suite.
+  // Anclamos la fixture a un repo sin commits: resultado determinista en
+  // cualquier entorno (best-effort: sin git la cabecera cae a "unknown").
+  spawnSync('git', ['init', '-q'], { cwd: repoRoot })
   writeFileSync(join(dshHome, 'AGENTS.md'), '# policy v1\n')
   writeFileSync(
     join(dshHome, 'profiles', 'engineering', 'package.json'),
@@ -88,5 +94,43 @@ describe('dream-manifest.sh', () => {
     const body = readFileSync(join(f.dshHome, '.dreamcoder-manifest.sha256'), 'utf8')
     assert.match(body, /AGENTS\.md/)
     assert.doesNotMatch(body, /package\.json$/m)
+  })
+
+  // Regresión: `git rev-parse HEAD` en un repo SIN commits imprime "HEAD" por
+  // stdout y además falla, así que el `|| echo unknown` concatenaba una segunda
+  // línea. La cabecera quedaba partida y la línea huérfana "unknown" hacía que
+  // `sha256sum --check` la marcara como "improperly formatted": verify reportaba
+  // drift falso sobre una instalación intacta. Verificado en el repo antes del
+  // fix: 146 tests, 1 fail (scripts/dream-manifest.test.ts:63).
+  test('la cabecera no se parte: sin líneas huérfanas y verify pasa sin drift', () => {
+    const f = makeFixture() // repo sin commits → caso que rompía la cabecera
+    const r = runGenerate(f)
+    assert.equal(r.status, 0, r.stderr)
+    const body = readFileSync(join(f.dshHome, '.dreamcoder-manifest.sha256'), 'utf8')
+    // Invariante: cada línea es o comentario de cabecera o entrada sha256sum.
+    const orphans = body
+      .split('\n')
+      .filter((l) => l !== '' && !l.startsWith('#') && !/^[0-9a-f]{64} {2}.+$/.test(l))
+    assert.deepEqual(orphans, [], `líneas huérfanas en el manifiesto:\n${body}`)
+    assert.equal(
+      body.split('\n').filter((l) => l.startsWith('# repo-commit:')).length,
+      1,
+      body,
+    )
+    assert.equal(runVerify(f).status, 0)
+  })
+
+  test('la cabecera registra el commit real cuando el repo tiene uno', () => {
+    const f = makeFixture()
+    const git = (args: string[]) => spawnSync('git', args, { cwd: f.repoRoot, encoding: 'utf8' })
+    git(['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'x'])
+    const head = git(['rev-parse', 'HEAD']).stdout.trim()
+    assert.match(head, /^[0-9a-f]{40}$/, 'la fixture debe tener un commit real')
+    const r = runGenerate(f)
+    assert.equal(r.status, 0, r.stderr)
+    const body = readFileSync(join(f.dshHome, '.dreamcoder-manifest.sha256'), 'utf8')
+    // La procedencia prometida en el README debe ser el commit real, no "unknown".
+    assert.match(body, new RegExp(`^# repo-commit: ${head}$`, 'm'))
+    assert.equal(runVerify(f).status, 0)
   })
 })
