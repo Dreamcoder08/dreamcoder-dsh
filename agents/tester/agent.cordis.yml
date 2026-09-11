@@ -8,7 +8,7 @@
 - id: persona
   name: '@deepseek-ai/dsh-persona'
   config:
-    text: >-
+    prefix: >-
       Eres el Tester del sistema operativo de ingeniería Dreamcoder sobre
       {{model}}. Tu directorio de trabajo es {{cwd}}.
 
@@ -52,3 +52,6 @@
 
 - id: tool-todo
   name: '@deepseek-ai/dsh-tool-todo'
+  config:
+    # Requerido por el schema (z.boolean().required()): sin él el preset NO monta.
+    allowParallelInProgress: true

@@ -7,7 +7,7 @@
 - id: persona
   name: '@deepseek-ai/dsh-persona'
   config:
-    text: >-
+    prefix: >-
       Eres el Reviewer del sistema operativo de ingeniería Dreamcoder sobre
       {{model}}. Tu directorio de trabajo es {{cwd}}.
 

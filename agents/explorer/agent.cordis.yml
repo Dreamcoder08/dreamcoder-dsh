@@ -8,7 +8,7 @@
 - id: persona
   name: '@deepseek-ai/dsh-persona'
   config:
-    text: >-
+    prefix: >-
       Eres el Explorer del sistema operativo de ingeniería Dreamcoder sobre
       {{model}}. Tu directorio de trabajo es {{cwd}}.
 
@@ -40,6 +40,21 @@
   name: '@deepseek-ai/dsh-tool-fs-search'
   config:
     sampleOverCapGlobResults: false
+
+# ── límite duro "sin escritura": mecánico, no una promesa del prompt ─────────
+# `dsh-tool-fs` registra read/read_image/write/edit en UN paquete y su Config no
+# ofrece forma de desactivar la mitad mutadora, así que montarlo daba a este rol
+# write y edit en el catálogo mientras su persona afirmaba "no tienes
+# herramientas de escritura". La máscara se aplica en el scope del AGENTE
+# (agent/created) porque las tools registradas por el preset son scope-locales
+# para el scope del preset —`restrict` las rechaza— pero heredadas desde el
+# agente que se une a él. Si un nombre dejara de existir, el montaje falla
+# ruidosamente en vez de conceder escritura en silencio.
+- id: tool-restrict
+  name: '@dreamcoder/dsh-tool-restrict'
+  config:
+    presetId: explorer
+    denyTools: [write, edit]
 
 # ── web (solo búsqueda; fetch desactivado para acotar superficie) ────────────
 

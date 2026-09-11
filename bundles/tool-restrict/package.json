@@ -1,0 +1,8 @@
+{
+  "name": "@dreamcoder/dsh-tool-restrict",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "index.mjs",
+  "description": "Máscara de tools por rol para presets DSH: aplica ctx.tools.restrict({deny}) en el scope del agente para que un límite duro declarado (p. ej. 'sin escritura') sea una propiedad de la composición y no una promesa del prompt."
+}

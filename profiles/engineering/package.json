@@ -2,7 +2,8 @@
   "name": "dsh-profile-engineering",
   "private": true,
   "dependencies": {
-    "@dreamcoder/dsh-engineering-bundle": "link:@BUNDLE_DIR@"
+    "@dreamcoder/dsh-engineering-bundle": "link:@BUNDLE_DIR@",
+    "@dreamcoder/dsh-tool-restrict": "link:@RESTRICT_DIR@"
   },
   "dsh": {
     "profile": {

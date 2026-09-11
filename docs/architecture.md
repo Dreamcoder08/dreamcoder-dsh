@@ -91,7 +91,7 @@ Hoy declara cuatro entradas:
 | `id: system-prompt` | override | Persona vacía del base → contrato Gentle-AI |
 | `id: compaction-basic` | override | Compactación automática con sumarización ruteada |
 | `id: repeat-tool-reminder` | override | Guard anti-bucles afinado, sin lavarse con contabilidad |
-| `insert: dream-commands` | inserción | `/dream-doctor` y `/dream-status` dentro de la sesión |
+| `insert: dream-commands` | inserción | `/dream-doctor`, `/dream-status`, `/dream-presets` y `/dream-tools` dentro de la sesión |
 
 ### Override `system-prompt`
 
@@ -157,10 +157,16 @@ y el companion `timeout-policy` del base es zero-config y no lleva override.
 ### Insert `dream-commands`
 
 El bundle exporta `bundles/engineering/host.mjs` (campo `main`) con un plugin
-Cordis que registra los comandos in-session `/dream-doctor` y `/dream-status`
+Cordis que registra los comandos in-session `/dream-doctor`, `/dream-status`,
+`/dream-presets` y `/dream-tools`
 contra el Service `commands` (@deepseek-ai/dsh-commands, ya compuesto por
 dsh-base); ejecutan el tooling out-of-tree del repo y devuelven su salida en
-la sesión. Es defensivo: sin registry no hay registro, sin logger hay
+la sesión. `/dream-presets` monta los seis presets y `/dream-tools` lee el
+catálogo efectivo del agente invocador (`tools.schemas(agent)`, donde el propio
+`Agent` es el `ScopeKey`) para comprobar el límite duro de su rol: son las dos
+verificaciones que ningún gate estático puede hacer, porque `verify-presets` no
+monta y el montaje no crea agente. Es defensivo: sin registry no hay registro,
+sin logger hay
 silencio; jamás tumba la sesión, y el ciclo de vida pertenece al Fiber vía
 `ctx.effect`.
 
@@ -171,17 +177,42 @@ visible: nombre y descripción) y `agent.cordis.yml` (la composición completa
 del plano-agente). Los seis roles: explorer, architect, implementer, tester,
 reviewer, security.
 
-El mecanismo de permisos es **de superficie, no de ACL**: el preset monta solo
-las filas de herramientas que el rol necesita y **lo que no está montado no
-existe para el agente**. Donde la restricción no puede ser estructural, el
-campo que actúa es el texto de `persona`; donde puede serlo, son campos
-exactos de config o la ausencia de la fila. Todos los roles montan fs y
-fs-search; los que ejecutan comandos suman bash/pwsh.
+El mecanismo de permisos tiene **dos capas**, y conviene no confundirlas:
+
+1. **Selección de superficie**: el preset monta solo las filas de herramientas
+   que el rol necesita y **lo que no está montado no existe para el agente**.
+   Todos los roles montan fs y fs-search; los que ejecutan comandos suman
+   bash/pwsh.
+2. **Máscara mecánica**: `@deepseek-ai/dsh-tool-fs` registra `read`,
+   `read_image`, `write` y `edit` en un solo paquete y su `Config` no permite
+   desactivar la mitad mutadora. Montarlo para poder leer concedía escritura a
+   roles que se declaran de solo lectura. Por eso `explorer` y `architect`
+   montan además la fila `tool-restrict` (paquete
+   `bundles/tool-restrict/`), que en el evento `agent/created` aplica
+   `ctx.tools.restrict({ deny: ['write','edit'] })` en el scope del agente y
+   solo si `agentPresets.composedPreset(agent.ctx)` coincide con su `presetId`.
+   Si un nombre de tool dejara de existir, el montaje falla — fail-closed, no
+   degradación silenciosa.
+
+Estado de verificación de la capa 2, explícito para no convertir el diseño en
+una afirmación: el paquete se instala y resuelve (verificado), y los seis
+presets montan de verdad con `agentPresets.standingKeyFor` (verificado, es el
+mismo montaje que hace el arranque de sesión). Lo que **todavía no** está
+verificado es el efecto final —que `write`/`edit` estén ausentes del catálogo
+efectivo en una sesión real de `explorer`/`architect`—, porque `standingKeyFor`
+monta sin agente y el evento `agent/created`, donde se aplica la máscara, no se
+dispara en esa comprobación. Hasta abrir una sesión real en esos presets, la
+máscara está **declarada y montada**, no observada.
+
+Lo que **no** está mecanizado se declara como política en la tabla: un límite
+contractual depende de que el agente siga su instrucción. El test
+`scripts/preset-restrictions.test.ts` cruza el README contra estas
+composiciones para que la distinción no se erosione.
 
 | Rol | Restricción mecánica (campo exacto) | Restricción de política |
 |---|---|---|
-| `explorer` | Sin filas de shell; `tool-web` con `fetch: false` | Solo hechos observados, con ruta:línea |
-| `architect` | Sin filas de shell; plan mode en grupo con `isolate: { planMode: true }` | Diseñar, no editar ni ejecutar |
+| `explorer` | Sin filas de shell; `tool-web` con `fetch: false`; máscara `deny: [write, edit]` | Solo hechos observados, con ruta:línea |
+| `architect` | Sin filas de shell; plan mode en grupo con `isolate: { planMode: true }`; máscara `deny: [write, edit]` | Diseñar, no editar ni ejecutar |
 | `implementer` | Único con `tool-jobs`; shell por `disabled` de plataforma; sin ask-user ni delegación | Cambio mínimo; jamás se autoaprueba |
 | `tester` | Shell con el mismo `disabled` por plataforma | Escribe solo tests y fixtures |
 | `reviewer` | Sin web ni todo | Veredicto `APPROVED` / `CHANGES_REQUIRED` |
@@ -193,6 +224,20 @@ Notas sobre la tabla:
   `persona` (@deepseek-ai/dsh-persona) + `agent-instructions` con
   `maxBytes: 65536` — es lo que afirma `scripts/verify-presets.ts` al validar
   sintaxis, forma de filas y resolución de paquetes desde el perfil instalado.
+- **Cómo se instalan importa**: `dsh-agent-presets` descubre presets con
+  `readdir(…, { withFileTypes: true })` y `child.isDirectory()`, y para un
+  symlink `Dirent.isDirectory()` es `false`. Enlazar el *directorio* del preset
+  lo dejaba fuera del roster **en silencio**: instalado, reportado por el doctor
+  y a la vez inutilizable. `install.sh` crea por eso un directorio real cuyos
+  archivos sí son symlinks al repo (ver `link_tree`), y `dream-doctor.sh`
+  rechaza un preset instalado como symlink.
+- **Montar no es lo mismo que existir**: ni `verify-presets.ts` ni el doctor
+  montan el preset, así que un campo de config requerido y ausente
+  (`persona.prefix`, `tool-todo.allowParallelInProgress`, `plan-mode.section`)
+  pasa ambos gates con un "✔" y rompe el arranque de la sesión. La verificación
+  autoritativa es el montaje real (`agentPresets.standingKeyFor(id)` con un DSH
+  vivo); `scripts/preset-config.test.ts` es la alarma temprana que corre en CI
+  sin DSH.
 - El `disabled` condicional de bash/pwsh usa etiquetas `!!js` que el Loader
   evalúa en su dialecto (`process.platform === 'win32'` en bash, espejo en
   pwsh); el verificador las acepta **sin evaluarlas**.

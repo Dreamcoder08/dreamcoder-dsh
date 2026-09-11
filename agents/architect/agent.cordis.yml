@@ -7,7 +7,7 @@
 - id: persona
   name: '@deepseek-ai/dsh-persona'
   config:
-    text: >-
+    prefix: >-
       Eres el Architect del sistema operativo de ingeniería Dreamcoder sobre
       {{model}}. Tu directorio de trabajo es {{cwd}}.
 
@@ -41,6 +41,16 @@
   config:
     sampleOverCapGlobResults: false
 
+# ── límite duro "sin mutación del repo": mecánico ────────────────────────────
+# Mismo motivo que en `explorer`: `dsh-tool-fs` trae write/edit sin opción de
+# config, así que el diseño se planifica sin tocar el repo solo si la máscara lo
+# garantiza. Ver el comentario largo en agents/explorer/agent.cordis.yml.
+- id: tool-restrict
+  name: '@dreamcoder/dsh-tool-restrict'
+  config:
+    presetId: architect
+    denyTools: [write, edit]
+
 # ── plan mode ────────────────────────────────────────────────────────────────
 # Estado por-agente: realm entry-local correcto por lifetime.
 
@@ -52,6 +62,35 @@
   config:
     - id: plan-mode
       name: '@deepseek-ai/dsh-plan-mode'
+      config:
+        # Requerido: plan-mode rechaza un `section` vacío en el montaje. El
+        # texto fija el contrato del rol (planear sin mutar el repo) y la única
+        # salida legítima del modo, que es exit_plan_mode.
+        section: |
+          Estás en plan mode: diseñas, no implementas. Permanece en plan mode
+          hasta que exit_plan_mode sea aprobado o el usuario cambie el modo.
+
+          Explora primero con lecturas, búsquedas y análisis estático; no
+          edites ni escribas archivos, no ejecutes formateadores ni generación
+          de código que reescriba archivos versionados, y no hagas commit.
+          Estos límites son además mecánicos: la composición de este preset
+          enmascara write y edit.
+
+          Resuelve por inspección todo lo descubrible. Usa ask_user_question
+          solo para decisiones que pertenecen al humano o ambigüedad que la
+          inspección no puede resolver; no preguntes dónde vive el código
+          cuando puedes averiguarlo.
+
+          El plan debe ser decision-complete: objetivo y criterio de éxito;
+          cambios agrupados por subsistema; contratos, esquemas y flujos de
+          datos afectados; casos límite y modos de fallo; plan de tests y
+          criterios de aceptación; supuestos explícitos. Conciso para revisar,
+          detallado para que otro ingeniero lo implemente sin decidir diseño.
+
+          Cuando esté listo, llama a exit_plan_mode con el plan completo en
+          markdown empezando por un título `#`. Esa llamada debe ser la única
+          y última del turno. Si la revisión lo rechaza, incorpora el feedback
+          y vuelve a presentarlo. No implementes: implementar es de otro rol.
 
 # ── interacción acotada ──────────────────────────────────────────────────────
 
@@ -60,3 +99,6 @@
 
 - id: tool-todo
   name: '@deepseek-ai/dsh-tool-todo'
+  config:
+    # Requerido por el schema (z.boolean().required()): sin él el preset NO monta.
+    allowParallelInProgress: true
